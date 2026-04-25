@@ -1,0 +1,2181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>三角形密铺探究</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<!-- 腾讯云开发 Web SDK v2（备选 CDN 列表，按顺序尝试） -->
+<script>
+  // 依次尝试多个 CDN，确保至少一个能加载
+  var cbCdnList = [
+    'https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js',
+    'https://unpkg.com/@cloudbase/js-sdk/dist/cloudbase.full.js',
+    'https://cdn.bootcdn.net/ajax/libs/cloudbase-js-sdk/latest/cloudbase.full.js'
+  ];
+  (function loadNext(idx) {
+    if (idx >= cbCdnList.length) {
+      console.error('[CloudBase] 所有 CDN 均无法加载 SDK');
+      return;
+    }
+    var s = document.createElement('script');
+    s.src = cbCdnList[idx];
+    s.onload = function() { console.log('[CloudBase] SDK 加载成功 from', cbCdnList[idx]); };
+    s.onerror = function() { loadNext(idx + 1); };
+    document.head.appendChild(s);
+  })(0);
+</script>
+<style>
+  :root {
+    --blue: #1a6ef5;
+    --blue-dark: #1557d4;
+    --blue-light: #e8f1fe;
+    --blue-mid: #4a8ff7;
+    --bg: #f4f6fb;
+    --bg2: #ffffff;
+    --bg3: #eef2f9;
+    --surface: #ffffff;
+    --surface2: #f0f4fc;
+    --border: #d0d9ee;
+    --border2: #b8c5e2;
+    --text: #1a2540;
+    --text2: #4a5880;
+    --text3: #8a9bc0;
+    --green: #1caf6f;
+    --green-bg: #e6f7f1;
+    --red: #d94040;
+    --red-bg: #fdeaea;
+    --gold: #e8a020;
+    --r: 14px;
+    --r2: 8px;
+    --shadow: 0 2px 12px rgba(26,110,245,.10);
+    --shadow2: 0 8px 32px rgba(26,110,245,.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; user-select: none; }
+
+  .page { display: none; height: 100vh; }
+  .page.active { display: flex; }
+
+  /* ── LOGIN ── */
+  #page-login { background: var(--bg); align-items: center; justify-content: center; }
+  .login-wrap { display: flex; background: var(--surface); border-radius: 20px; box-shadow: var(--shadow2); overflow: hidden; width: 680px; }
+  .login-left { width: 260px; background: linear-gradient(160deg, var(--blue) 0%, var(--blue-dark) 100%); padding: 40px 30px; display: flex; flex-direction: column; justify-content: center; color: #fff; }
+  .login-left h2 { font-size: 22px; font-weight: 700; margin-bottom: 10px; }
+  .login-left p { font-size: 13px; opacity: .8; line-height: 1.7; }
+  .login-left-shapes { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .login-left-shapes span { padding: 4px 10px; border-radius: 20px; background: rgba(255,255,255,.2); font-size: 11px; }
+  .login-right { flex: 1; padding: 40px 44px; display: flex; flex-direction: column; justify-content: center; }
+  .login-right h1 { font-size: 22px; font-weight: 700; color: var(--blue); margin-bottom: 4px; }
+  .login-right .sub { font-size: 13px; color: var(--text2); margin-bottom: 28px; }
+  .login-tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 2px solid var(--border); }
+  .login-tab { padding: 8px 20px; font-size: 14px; font-weight: 600; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all .2s; }
+  .login-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+  .login-field { margin-bottom: 14px; }
+  .login-field label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 5px; font-weight: 500; }
+  .login-field input { width: 100%; padding: 10px 13px; border: 1.5px solid var(--border); border-radius: var(--r2); background: var(--bg3); font-size: 14px; color: var(--text); outline: none; font-family: inherit; transition: border .2s; }
+  .login-field input:focus { border-color: var(--blue); background: #fff; }
+  .btn-login { width: 100%; padding: 12px; background: var(--blue); border: none; border-radius: var(--r2); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all .2s; margin-top: 8px; }
+  .btn-login:hover { background: var(--blue-dark); box-shadow: 0 4px 14px rgba(26,110,245,.3); }
+  #class-field { display: none; }
+
+  /* ── STUDENT LAYOUT ── */
+  #page-student { flex-direction: column; }
+  .stu-topbar { height: 50px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 16px; flex-shrink: 0; box-shadow: var(--shadow); z-index: 10; }
+  .stu-brand { display: flex; align-items: center; gap: 8px; }
+  .stu-brand-icon { width: 28px; height: 28px; background: var(--blue); border-radius: 7px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; }
+  .stu-brand-name { font-size: 14px; font-weight: 700; color: var(--text); }
+  .stu-sep { width: 1px; height: 24px; background: var(--border); }
+  .stu-info { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 10px; }
+  .stu-role-tag { padding: 2px 8px; border-radius: 10px; background: var(--blue-light); color: var(--blue); font-size: 11px; font-weight: 700; }
+  .stu-info-name { font-weight: 600; color: var(--text); }
+  .stu-topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .btn-outline { padding: 5px 12px; border: 1.5px solid var(--border); border-radius: 6px; background: transparent; color: var(--text2); font-size: 12px; cursor: pointer; transition: all .15s; font-family: inherit; }
+  .btn-outline:hover { border-color: var(--blue); color: var(--blue); }
+
+  /* ── SYNC STATUS ── */
+  .sync-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    transition: all .3s; white-space: nowrap;
+  }
+  .sync-badge.init    { background: #e8f0fe; color: #4285f4; }
+  .sync-badge.cloud   { background: #e6f4ea; color: #1e8e3e; }
+  .sync-badge.local   { background: #fef7e0; color: #b06000; }
+  .sync-badge.syncing { background: #e8f0fe; color: #1a73e8; }
+
+  @keyframes syncPulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: .4; }
+  }
+  .sync-badge.syncing .sync-dot { animation: syncPulse 1s ease-in-out infinite; }
+
+  .stu-body { flex: 1; display: flex; overflow: hidden; }
+
+  /* Left panel */
+  .stu-left { width: 170px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0; }
+  .panel-label { padding: 10px 14px 6px; font-size: 10px; font-weight: 700; letter-spacing: .08em; color: var(--text3); text-transform: uppercase; }
+  .shape-list { padding: 6px 10px; display: flex; flex-direction: column; gap: 5px; }
+  .shape-btn { padding: 10px 10px; border-radius: var(--r2); border: 2px solid transparent; background: var(--bg3); cursor: pointer; display: flex; align-items: center; gap: 9px; transition: all .15s; }
+  .shape-btn:hover { background: var(--blue-light); border-color: var(--blue-mid); }
+  .shape-btn.active { background: var(--blue-light); border-color: var(--blue); }
+  .shape-btn svg { width: 32px; height: 32px; flex-shrink: 0; }
+  .shape-btn-name { font-size: 13px; font-weight: 600; }
+  .shape-btn-sub { font-size: 10px; color: var(--text3); }
+  .shape-btn-locked { font-size: 9px; color: var(--blue); font-weight: 700; margin-top: 1px; }
+  .panel-div { height: 1px; background: var(--border); margin: 6px 10px; }
+
+  /* Angle panel in left */
+  .angle-panel { padding: 10px 12px; }
+  .angle-panel h3 { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .angle-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .angle-lbl { width: 20px; height: 20px; border-radius: 50%; background: var(--blue-light); font-size: 9px; font-weight: 700; color: var(--blue); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .angle-in { flex: 1; padding: 5px 7px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--bg3); color: var(--text); font-size: 13px; font-family: 'JetBrains Mono', monospace; outline: none; transition: border .15s; }
+  .angle-in:focus { border-color: var(--blue); background: #fff; }
+  .angle-unit { font-size: 11px; color: var(--text3); flex-shrink: 0; }
+  .angle-sum-box { padding: 7px 10px; border-radius: 8px; background: var(--bg3); border: 1.5px solid var(--border); display: flex; justify-content: space-between; align-items: center; margin: 6px 0; font-size: 12px; }
+  .angle-sum-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--text); }
+  .angle-sum-val.ok { color: var(--green); }
+  .angle-sum-val.err { color: var(--red); }
+  .angle-hint { font-size: 10px; color: var(--text3); margin-bottom: 8px; line-height: 1.5; }
+  .btn-add { width: 100%; padding: 9px; background: var(--blue); border: none; border-radius: var(--r2); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all .15s; }
+  .btn-add:hover { background: var(--blue-dark); }
+  .btn-add:disabled { opacity: .4; cursor: not-allowed; }
+
+  .tiling-tip { padding: 8px 12px; margin: 0 10px 8px; border-radius: 8px; background: var(--blue-light); font-size: 10px; color: var(--blue); line-height: 1.6; border-left: 3px solid var(--blue); }
+  .type-locked-tip { padding: 6px 12px; margin: 0 10px 6px; border-radius: 8px; background: var(--red-bg); font-size: 10px; color: var(--red); display: none; }
+
+  /* Canvas */
+  .stu-canvas-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+  .canvas-toolbar { height: 44px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 14px; gap: 6px; flex-shrink: 0; }
+  .tool-hint { font-size: 11px; color: var(--text3); display: flex; align-items: center; gap: 10px; }
+  .tool-hint span { display: flex; align-items: center; gap: 4px; }
+  .dot-blue { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); display: inline-block; }
+  .dot-green { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; }
+  .dot-gold { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); display: inline-block; }
+  .tool-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+  .btn-snap { padding: 4px 10px; border-radius: 6px; border: 1.5px solid var(--border); background: transparent; font-size: 11px; color: var(--text2); cursor: pointer; font-family: inherit; transition: all .15s; }
+  .btn-snap.active { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
+  .btn-snap:hover { border-color: var(--blue); color: var(--blue); }
+  .btn-clear { padding: 4px 10px; border-radius: 6px; border: 1.5px solid var(--border); background: transparent; font-size: 11px; color: var(--text2); cursor: pointer; font-family: inherit; transition: all .15s; }
+  .btn-clear:hover { border-color: var(--red); color: var(--red); }
+  .btn-del { padding: 4px 10px; border-radius: 6px; border: 1.5px solid var(--red); background: transparent; font-size: 11px; color: var(--red); cursor: pointer; font-family: inherit; transition: all .15s; }
+  .btn-del:hover { background: var(--red); color: #fff; }
+  .angle-info-badge { margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 4px 12px; border-radius: 20px; background: var(--bg3); border: 1.5px solid var(--border); font-size: 12px; }
+  .badge-lbl { color: var(--text3); }
+  .badge-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--gold); font-size: 14px; }
+  .badge-val.success { color: var(--green); }
+  .badge-val.over { color: var(--red); }
+
+  .canvas-area { flex: 1; position: relative; overflow: hidden;
+    background: #fff;
+    background-image: radial-gradient(circle, rgba(26,110,245,.06) 1.5px, transparent 1.5px);
+    background-size: 28px 28px;
+  }
+  #main-canvas { display: block; width: 100%; height: 100%; }
+  .canvas-hint-text { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); padding: 7px 16px; background: rgba(255,255,255,.88); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; color: var(--text3); pointer-events: none; white-space: nowrap; backdrop-filter: blur(4px); box-shadow: var(--shadow); }
+
+  /* Bottom bar */
+  .bottom-bar { height: 58px; background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 16px; flex-shrink: 0; }
+  .verdict-label { font-size: 13px; color: var(--text2); font-weight: 500; }
+  .verdict-group { display: flex; gap: 8px; }
+  .verdict-opt input { display: none; }
+  .verdict-opt-inner { padding: 7px 16px; border-radius: 20px; border: 2px solid var(--border); font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 6px; user-select: none; }
+  .verdict-opt-inner.can { color: var(--green); }
+  .verdict-opt-inner.cannot { color: var(--red); }
+  .verdict-opt input:checked + .verdict-opt-inner.can { background: var(--green-bg); border-color: var(--green); }
+  .verdict-opt input:checked + .verdict-opt-inner.cannot { background: var(--red-bg); border-color: var(--red); }
+  .bottom-bar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .btn-submit { display: flex; align-items: center; gap: 7px; padding: 9px 22px; border-radius: 22px; background: var(--blue); border: none; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all .15s; box-shadow: 0 4px 14px rgba(26,110,245,.28); }
+  .btn-submit:hover { background: var(--blue-dark); transform: translateY(-1px); }
+  .btn-submit:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-check { display: flex; align-items: center; gap: 7px; padding: 9px 20px; border-radius: 22px; background: var(--gold); border: none; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all .15s; box-shadow: 0 4px 14px rgba(232,160,32,.3); }
+  .btn-check:hover { background: #d4921a; transform: translateY(-1px); }
+  .check-result { display: flex; align-items: center; gap: 8px; padding: 7px 16px; border-radius: 22px; font-size: 13px; font-weight: 700; }
+  .check-pass { background: var(--green-bg); color: var(--green); border: 2px solid var(--green); }
+  .check-fail { background: var(--red-bg); color: var(--red); border: 2px solid var(--red); }
+  .check-pending { background: var(--bg3); color: var(--text3); border: 2px solid var(--border); }
+  .btn-delete-sel:hover { background: var(--red-bg); }
+
+  /* Right panel (sel info) */
+  .stu-right { width: 200px; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0; }
+  .sel-panel { padding: 12px 14px; display: none; }
+  .sel-panel-title { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+  .sel-prop { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .sel-k { color: var(--text3); }
+  .sel-v { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .rot-fast { display: flex; gap: 4px; margin-top: 8px; }
+  .rot-fast button { flex: 1; padding: 5px; border-radius: 6px; border: 1.5px solid var(--border); background: transparent; font-size: 11px; color: var(--text2); cursor: pointer; font-family: inherit; transition: all .15s; }
+  .rot-fast button:hover { border-color: var(--blue); color: var(--blue); }
+  .sel-empty { padding: 20px 14px; text-align: center; color: var(--text3); font-size: 12px; }
+
+  /* ── SUCCESS MODAL ── */
+  .success-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(26,110,245,.18); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; animation: fadeIn .3s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .success-card { background: #fff; border-radius: 20px; padding: 36px; width: 520px; box-shadow: 0 20px 60px rgba(26,110,245,.2); text-align: center; animation: popIn .35s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes popIn { from { opacity:0; transform: scale(.85) translateY(20px); } to { opacity:1; transform: scale(1) translateY(0); } }
+  .success-icon { font-size: 52px; margin-bottom: 12px; }
+  .success-title { font-size: 26px; font-weight: 900; color: var(--text); margin-bottom: 6px; }
+  .success-sub { font-size: 14px; color: var(--text2); margin-bottom: 24px; line-height: 1.7; }
+  .success-canvas-wrap { border-radius: 12px; overflow: hidden; border: 2px solid var(--border); margin-bottom: 16px; background: var(--bg3); }
+  .success-canvas-wrap canvas { display: block; width: 100%; }
+  .success-actions { display: flex; gap: 10px; justify-content: center; }
+  .success-actions button { padding: 10px 24px; border-radius: 22px; border: 2px solid var(--border); background: transparent; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all .15s; }
+  .success-actions .btn-dismiss { color: var(--text2); }
+  .success-actions .btn-dismiss:hover { border-color: var(--text2); }
+  .success-actions .btn-save { background: var(--green); border-color: var(--green); color: #fff; }
+  .success-actions .btn-save:hover { background: #179b60; border-color: #179b60; }
+
+  /* ── TOAST ── */
+  #toast-container { position: fixed; top: 16px; right: 16px; z-index: 9998; display: flex; flex-direction: column; gap: 6px; }
+  .toast { padding: 9px 14px; border-radius: 8px; background: var(--surface); border: 1.5px solid var(--border); font-size: 13px; box-shadow: var(--shadow); animation: slideInR .25s ease; display: flex; align-items: center; gap: 7px; max-width: 300px; }
+  @keyframes slideInR { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
+  .toast.success { border-color: rgba(28,175,111,.3); }
+  .toast.error { border-color: rgba(217,64,64,.3); }
+  .toast.info { border-color: rgba(26,110,245,.3); }
+
+  /* ── TEACHER ── */
+  #page-teacher { flex-direction: column; }
+  .t-topbar { height: 50px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 16px; flex-shrink: 0; box-shadow: var(--shadow); }
+  .t-body { flex: 1; display: flex; overflow: hidden; }
+  .t-list { width: 320px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+  .t-list-header { padding: 16px; border-bottom: 1px solid var(--border); }
+  .t-list-header h2 { font-size: 15px; font-weight: 700; }
+  .t-list-header p { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .t-filter { display: flex; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .t-filter button { padding: 3px 10px; border-radius: 20px; border: 1.5px solid var(--border); background: transparent; font-size: 11px; color: var(--text2); cursor: pointer; font-family: inherit; transition: all .15s; }
+  .t-filter button.active { background: var(--blue-light); border-color: var(--blue); color: var(--blue); }
+  .t-items { flex: 1; overflow-y: auto; padding: 8px; }
+  .t-item { padding: 10px 12px; border-radius: var(--r2); border: 1.5px solid transparent; cursor: pointer; margin-bottom: 5px; transition: all .15s; }
+  .t-item:hover { background: var(--bg3); border-color: var(--border); }
+  .t-item.active { background: var(--blue-light); border-color: var(--blue); }
+  .t-item-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+  .t-item-name { font-size: 13px; font-weight: 700; }
+  .t-badge { padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+  .t-badge.can { background: var(--green-bg); color: var(--green); }
+  .t-badge.cannot { background: var(--red-bg); color: var(--red); }
+  .t-item-meta { font-size: 11px; color: var(--text3); }
+  .t-empty { padding: 40px 20px; text-align: center; color: var(--text3); font-size: 13px; }
+
+  .t-detail { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .t-detail-empty { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; color: var(--text3); }
+  .t-detail-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .t-detail-title { font-size: 17px; font-weight: 800; }
+  .t-detail-sub { font-size: 12px; color: var(--text2); margin-top: 1px; }
+  .t-detail-body { flex: 1; display: flex; overflow: hidden; padding: 16px; gap: 16px; }
+  .t-canvas-wrap { flex: 1; border-radius: var(--r); border: 1.5px solid var(--border); overflow: hidden; background: var(--bg); position: relative; min-height: 0; }
+  #detail-canvas { width: 100%; height: 100%; }
+  .t-sidebar { width: 200px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; }
+  .t-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r2); padding: 12px; }
+  .t-card-title { font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+  .t-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }
+  .t-row-k { color: var(--text3); }
+  .t-row-v { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .t-note { font-size: 10px; color: var(--text3); background: var(--bg3); padding: 5px 7px; border-radius: 5px; margin-top: 6px; line-height: 1.5; }
+  .t-comment textarea { width: 100%; height: 60px; padding: 7px 8px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--bg3); font-size: 12px; color: var(--text); resize: none; outline: none; font-family: inherit; transition: border .15s; }
+  .t-comment textarea:focus { border-color: var(--blue); background: #fff; }
+  .t-save-btn { width: 100%; padding: 7px; border-radius: 6px; border: 1.5px solid var(--border); background: transparent; font-size: 12px; color: var(--text2); cursor: pointer; font-family: inherit; transition: all .15s; margin-top: 4px; }
+  .t-save-btn:hover { border-color: var(--green); color: var(--green); }
+  .t-actions { display: flex; gap: 6px; }
+  .t-btn-star { flex: 1; padding: 6px; border-radius: 6px; border: 1.5px solid var(--border); background: transparent; font-size: 11px; color: var(--text2); cursor: pointer; font-family: inherit; transition: all .15s; }
+  .t-btn-star:hover { border-color: var(--gold); color: var(--gold); }
+  .t-btn-star.starred { background: rgba(232,160,32,.1); border-color: var(--gold); color: var(--gold); }
+  .btn-clear-all { padding: 5px 12px; border: 1.5px solid var(--red); border-radius: 6px; background: transparent; color: var(--red); font-size: 12px; cursor: pointer; transition: all .15s; font-family: inherit; }
+  .btn-clear-all:hover { background: var(--red); color: #fff; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<!-- ════════════════════════════
+     LOGIN
+════════════════════════════ -->
+<div id="page-login" class="page active">
+  <div class="login-wrap">
+    <div class="login-left">
+      <h2>📐 三角形密铺</h2>
+      <p>自定义三角形的三个内角，探究任意三角形能否实现无空隙、不重叠的平面密铺。</p>
+      <div class="login-left-shapes">
+        <span>△ 锐角三角形</span>
+        <span>△ 直角三角形</span>
+        <span>△ 钝角三角形</span>
+      </div>
+    </div>
+    <div class="login-right">
+      <h1>欢迎来到三角形密铺探究</h1>
+      <div class="sub">选择一个身份开始吧</div>
+      <div class="login-tabs">
+        <div class="login-tab active" id="tab-student" onclick="switchTab('student')">🎓 学生</div>
+        <div class="login-tab" id="tab-teacher" onclick="switchTab('teacher')">📋 教师</div>
+      </div>
+      <div class="login-field" id="name-field">
+        <label>姓名</label>
+        <input id="login-name" type="text" placeholder="请输入你的姓名" />
+      </div>
+      <div class="login-field" id="class-field" style="display:none;">
+        <label>班级</label>
+        <input id="login-class" type="text" placeholder="例如：三年级一班" />
+      </div>
+      <button class="btn-login" id="btn-login" onclick="doLogin()">进入探究 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════
+     STUDENT
+════════════════════════════ -->
+<div id="page-student" class="page">
+  <!-- Topbar -->
+  <div class="stu-topbar">
+    <div class="stu-brand">
+      <div class="stu-brand-icon">△</div>
+      <span class="stu-brand-name">三角形密铺</span>
+    </div>
+    <div class="stu-sep"></div>
+    <div class="stu-info">
+      <span class="stu-role-tag" id="role-tag">学生</span>
+      <span class="stu-info-name" id="user-name-display">—</span>
+      <span id="user-class-display" style="font-size:11px;color:var(--text3)"></span>
+    </div>
+    <div id="sync-badge" class="sync-badge init" title="数据同步状态">
+      <span class="sync-dot">●</span><span id="sync-text">连接中…</span>
+    </div>
+    <div class="stu-topbar-right">
+      <button class="btn-outline" onclick="showPage('page-login')">退出登录</button>
+      <button class="btn-outline" onclick="showTeacherFromStudent()">👨‍🏫 教师端</button>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="stu-body">
+    <!-- Left panel -->
+    <div class="stu-left">
+      <div class="panel-label">图形选择</div>
+      <div class="shape-list" id="shape-list"></div>
+      <div class="panel-div"></div>
+      <div class="panel-label">内角设置</div>
+      <div class="angle-panel">
+        <div class="angle-sum-box">
+          <span style="font-size:12px;color:var(--text3)">内角和</span>
+          <span class="angle-sum-val" id="angle-sum-val">180°</span>
+        </div>
+        <div class="angle-hint" id="angle-hint">三角形内角和 = 180°</div>
+        <button class="btn-add" id="btn-add" onclick="addShapeToCanvas()">➕ 添加图形</button>
+        <div class="panel-div" style="margin:8px 0;"></div>
+        <h3 style="margin-bottom:6px;">∠ 各内角</h3>
+        <div id="angle-inputs"></div>
+      </div>
+      <div class="type-locked-tip" id="type-locked-tip">⚠️ 当前只能使用同一种图形</div>
+      <div class="tiling-tip" id="tiling-tip">要求：边等长重合、无重叠、无缝隙。拼好后选择结论并提交。</div>
+    </div>
+
+    <!-- Canvas -->
+    <div class="stu-canvas-wrap">
+      <div class="canvas-toolbar">
+        <div class="tool-hint">
+          <span><span class="dot-blue"></span> 顶点=旋转</span>
+          <span><span class="dot-green"></span> 内部=拖动</span>
+          <span><span class="dot-gold"></span> 边吸附</span>
+        </div>
+        <div class="tool-sep"></div>
+        <button class="btn-snap active" id="btn-snap" onclick="toggleSnap()">🧲 边吸附</button>
+        <button class="btn-del" onclick="deleteSelectedShape()">🗑 删除</button>
+        <button class="btn-clear" onclick="clearCanvas()">清空全部</button>
+      </div>
+      <div class="canvas-area">
+        <canvas id="main-canvas"></canvas>
+        <div class="canvas-hint-text" id="canvas-hint-text">选择图形 → 设置内角 → 添加到画布 → 拖拽旋转拼接 → 观察接点角度 → 选择结论提交</div>
+      </div>
+      <!-- Bottom bar -->
+      <div class="bottom-bar">
+        <span class="verdict-label">密铺检测</span>
+        <button class="btn-check" id="btn-check" onclick="showVerdictPanel()" style="display:none;">🔍 检测密铺</button>
+        <div class="check-pending" id="check-result" style="display:none;"></div>
+        <span class="verdict-label" style="margin-left:8px;">结论</span>
+        <div class="verdict-group">
+          <label class="verdict-opt">
+            <input type="radio" name="verdict" id="verdict-can" value="can" onchange="onVerdictChange()">
+            <span class="verdict-opt-inner can"><span>✅</span> 可以密铺</span>
+          </label>
+          <label class="verdict-opt">
+            <input type="radio" name="verdict" id="verdict-cannot" value="cannot" onchange="onVerdictChange()">
+            <span class="verdict-opt-inner cannot"><span>❌</span> 不可密铺</span>
+          </label>
+        </div>
+        <div class="bottom-bar-right">
+          <button class="btn-submit" id="btn-submit" onclick="submitWork()" disabled>📤 提交作业</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right panel (sel info) -->
+    <div class="stu-right">
+      <div class="sel-empty" id="sel-empty">点击画布上的图形<br>查看详情</div>
+      <div class="sel-panel" id="sel-panel">
+        <div class="sel-panel-title">选中图形</div>
+        <div class="sel-prop"><span class="sel-k">类型</span><span class="sel-v" id="sel-type">—</span></div>
+        <div class="sel-prop"><span class="sel-k">旋转</span><span class="sel-v" id="sel-rot">0°</span></div>
+        <div class="sel-prop"><span class="sel-k">内角</span><span class="sel-v" id="sel-angles">—</span></div>
+        <div class="rot-fast">
+          <button onclick="rotateSel(-15)">↺ -15°</button>
+          <button onclick="rotateSel(15)">↻ +15°</button>
+          <button onclick="rotateSel(-45)">↺ -45°</button>
+          <button onclick="rotateSel(45)">↻ +45°</button>
+        </div>
+        <!-- 边长显示 -->
+        <div style="margin-top:10px;padding:7px 8px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.06em;margin-bottom:5px;">各边边长（像素）</div>
+          <div class="sel-prop" style="margin-bottom:3px;"><span class="sel-k">边 a（∠1对边）</span><span class="sel-v" id="sel-side-a" style="color:var(--blue);">—</span></div>
+          <div class="sel-prop" style="margin-bottom:3px;"><span class="sel-k">边 b（∠2对边）</span><span class="sel-v" id="sel-side-b" style="color:var(--blue);">—</span></div>
+          <div class="sel-prop"><span class="sel-k">边 c（∠3对边）</span><span class="sel-v" id="sel-side-c" style="color:var(--blue);">—</span></div>
+        </div>
+        <button class="btn-delete-sel" id="btn-delete-sel" onclick="deleteSelected()" style="width:100%;margin-top:8px;padding:7px;border-radius:8px;border:1.5px solid var(--red);background:transparent;color:var(--red);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;display:none;">
+          🗑 删除图形
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════
+     TEACHER
+════════════════════════════ -->
+<div id="page-teacher" class="page">
+  <div class="t-topbar">
+    <div class="stu-brand">
+      <div class="stu-brand-icon">△</div>
+      <span class="stu-brand-name">三角形密铺 · 教师端</span>
+    </div>
+    <div class="stu-sep"></div>
+    <button class="btn-outline" onclick="showPage('page-student')">← 返回学生端</button>
+    <div class="stu-topbar-right">
+      <div class="stu-info">
+        <span class="stu-role-tag" style="background:#fff3e0;color:#e8a020;">教师</span>
+        <span class="stu-info-name" id="t-name">教师</span>
+      </div>
+      <button class="btn-clear-all" onclick="clearAllData()">🗑 清除全部数据</button>
+      <button class="btn-outline" onclick="injectDemos()" title="仅本地演示用，不写入云端">📋 导入示例数据</button>
+    </div>
+  </div>
+  <div class="t-body">
+    <div class="t-list">
+      <div class="t-list-header">
+        <h2>学生作业</h2>
+        <p id="t-count">共 0 份</p>
+      </div>
+      <div class="t-filter">
+        <button class="active" onclick="tFilter('all',this)">全部</button>
+        <button onclick="tFilter('can',this)">✅ 可</button>
+        <button onclick="tFilter('cannot',this)">❌ 否</button>
+        <button onclick="tFilter('star',this)">⭐</button>
+      </div>
+      <div class="t-items" id="t-items"></div>
+    </div>
+    <div class="t-detail">
+      <div class="t-detail-empty" id="t-detail-empty">
+        <div style="font-size:40px;opacity:.25">📋</div>
+        <div>点击左侧作业查看详情</div>
+      </div>
+      <div id="t-detail-content" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+        <div class="t-detail-header">
+          <div>
+            <div class="t-detail-title" id="t-detail-name">—</div>
+            <div class="t-detail-sub" id="t-detail-meta">—</div>
+          </div>
+          <div class="t-actions">
+            <button class="t-btn-star" id="t-star-btn" onclick="toggleStar()">⭐ 优秀</button>
+          </div>
+        </div>
+        <div class="t-detail-body">
+          <div class="t-canvas-wrap">
+            <canvas id="detail-canvas"></canvas>
+          </div>
+          <div class="t-sidebar">
+            <div class="t-card">
+              <div class="t-card-title">基本信息</div>
+              <div class="t-row"><span class="t-row-k">编号</span><span class="t-row-v" id="t-subId">—</span></div>
+              <div class="t-row"><span class="t-row-k">次序</span><span class="t-row-v" id="t-seq">—</span></div>
+              <div class="t-row"><span class="t-row-k">图形</span><span class="t-row-v" id="t-shape">—</span></div>
+              <div class="t-row"><span class="t-row-k">内角</span><span class="t-row-v" id="t-angles">—</span></div>
+              <div id="t-note-el"></div>
+            </div>
+            <div class="t-card" id="t-history-card" style="display:none;">
+              <div class="t-card-title">📜 历史提交</div>
+              <div id="t-history-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+            </div>
+            <div class="t-card">
+              <div class="t-card-title">密铺结论</div>
+              <div id="t-conclusion" style="font-size:14px;font-weight:700;"></div>
+            </div>
+            <div class="t-card t-comment">
+              <div class="t-card-title">教师点评</div>
+              <textarea id="t-comment" placeholder="输入点评…"></textarea>
+              <button class="t-save-btn" onclick="saveComment()">💾 保存点评</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Success Modal (dynamically inserted) -->
+
+<script>
+// ═══════════════════════════════════════════
+//  CLOUDBASE CONFIG — 请将下面两个值替换为你的环境信息
+// ═══════════════════════════════════════════
+const CB_ENV_ID = 'mathclass-d5gz220u6e7f7f85f';       // 替换为你的云开发环境 ID（如 xxx-abc123）
+const CB_REGION = 'ap-shanghai';       // 根据你创建环境时选的地域填写
+
+let db = null; // 云数据库引用
+
+async function initCloudBase() {
+  updateSyncStatus('init');
+  try {
+    // 检查 SDK 是否加载成功
+    if (typeof cloudbase === 'undefined') {
+      throw new Error('CloudBase SDK 未加载，请检查网络或 CDN 是否可访问');
+    }
+    // v2 SDK：正确初始化（env + region）
+    const app = cloudbase.init({ env: CB_ENV_ID, region: CB_REGION });
+    // v2 SDK：正确匿名登录 API
+    const { data, error } = await app.auth.signInAnonymously();
+    if (error) {
+      throw new Error(`匿名登录失败: ${error.message}`);
+    }
+    console.log('[CloudBase] 匿名登录成功，用户标识:', data.uid);
+    db = app.database();
+    console.log('[CloudBase] 初始化成功，db 就绪');
+    updateSyncStatus('cloud');
+  } catch (e) {
+    console.error('[CloudBase] 初始化失败:', e.message || e);
+    db = null;
+    updateSyncStatus('local');
+  }
+}
+
+// ── 同步状态指示器 ──
+const SYNC_CONFIG = {
+  init:    { icon: '◐', text: '连接中…',    cls: 'init'    },
+  cloud:   { icon: '●', text: '云端已连接',  cls: 'cloud'   },
+  local:   { icon: '●', text: '仅本地模式',  cls: 'local'   },
+  syncing: { icon: '◐', text: '同步中…',    cls: 'syncing' },
+};
+
+function updateSyncStatus(status) {
+  state.syncStatus = status;
+  const badge = document.getElementById('sync-badge');
+  const textEl = document.getElementById('sync-text');
+  if (!badge || !textEl) return;
+  const cfg = SYNC_CONFIG[status] || SYNC_CONFIG.init;
+  badge.className = `sync-badge ${cfg.cls}`;
+  badge.title = {
+    init:    '正在连接云端…',
+    cloud:   '已连接腾讯云开发，数据多端共享',
+    local:   '云端连接失败，数据仅保存在本地',
+    syncing: '正在同步数据…',
+  }[status] || '';
+  textEl.textContent = cfg.text;
+}
+
+// ═══════════════════════════════════════════
+//  CONFIG — 仅三角形
+// ═══════════════════════════════════════════
+const SHAPES_CONFIG = [
+  { id:'triangle', name:'三角形', sides:3, sum:180, angles:[60,60,60], color:'#1a6ef5', hex:'#5b8fff', size:150 },
+];
+
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+const state = {
+  loginTab: 'student',
+  currentUser: null,
+  currentShape: 0,
+  lockedShapeId: null,
+  shapes: [],
+  syncStatus: 'init', // 'init' | 'cloud' | 'local' | 'syncing'
+  selectedId: null,
+  snapEnabled: true,
+  nextId: 1,
+  snapPreview: null,
+  currentTFilter: 'all',
+  selectedSubId: null,
+  tilingChecked: false,
+  tilingPass: false,
+};
+
+let mainCanvas, mainCtx;
+let detailCanvas, detailCtx;
+let isDragging = false, isRotating = false;
+let dragOffX = 0, dragOffY = 0;
+let rotAngle0 = 0, rotShape0 = 0, rotId = null;
+let hoverVInfo = null, hoverShId = null;
+
+// ═══════════════════════════════════════════
+//  LOGIN
+// ═══════════════════════════════════════════
+function switchTab(tab) {
+  state.loginTab = tab;
+  document.getElementById('tab-student').classList.toggle('active', tab==='student');
+  document.getElementById('tab-teacher').classList.toggle('active', tab==='teacher');
+  // 教师模式不需要姓名和班级
+  document.getElementById('name-field').style.display = tab==='teacher' ? 'none' : '';
+  document.getElementById('class-field').style.display = tab==='teacher' ? 'none' : '';
+  document.getElementById('role-tag').textContent = tab==='teacher' ? '教师' : '学生';
+}
+
+function doLogin() {
+  // 教师模式不需要姓名
+  if (state.loginTab === 'student') {
+    const name = document.getElementById('login-name').value.trim();
+    if (!name) { showToast('请输入姓名', 'error'); return; }
+    state.currentUser = name;
+    document.getElementById('user-name-display').textContent = name;
+    const cls = document.getElementById('login-class').value.trim();
+    document.getElementById('user-class-display').textContent = cls ? `· ${cls}` : '';
+    document.getElementById('t-name').textContent = name;
+  } else {
+    state.currentUser = '教师';
+    document.getElementById('t-name').textContent = '教师';
+  }
+  document.getElementById('role-tag').textContent = state.loginTab === 'teacher' ? '教师' : '学生';
+
+  if (state.loginTab === 'teacher') {
+    showPage('page-teacher');
+    initTeacher();
+  } else {
+    showPage('page-student');
+    initStudent();
+  }
+}
+
+// 页面加载后初始化 CloudBase（等待 SDK 加载完成）
+function whenCloudBaseReady(fn) {
+  if (typeof cloudbase !== 'undefined') { fn(); return; }
+  var itv = setInterval(() => {
+    if (typeof cloudbase !== 'undefined') { clearInterval(itv); fn(); }
+  }, 100);
+  // 超时兜底：3秒后强制执行
+  setTimeout(() => { clearInterval(itv); fn(); }, 3000);
+}
+document.addEventListener('DOMContentLoaded', () => {
+  whenCloudBaseReady(initCloudBase);
+});
+
+function showTeacherFromStudent() {
+  showPage('page-teacher');
+  initTeacher();
+}
+
+// ═══════════════════════════════════════════
+//  PAGE NAV
+// ═══════════════════════════════════════════
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 'page-teacher') initTeacher();
+}
+
+// ═══════════════════════════════════════════
+//  STUDENT INIT
+// ═══════════════════════════════════════════
+function initStudent() {
+  state.lockedShapeId = null;
+  state.shapes = [];
+  state.selectedId = null;
+  state.tilingChecked = false;
+  state.tilingPass = false;
+  state.currentShape = 0;
+  currentAngles = [...SHAPES_CONFIG[0].angles];
+  buildShapeList();
+  buildAngleInputs();
+  // Reset UI - 学生可以直接选择结论
+  document.getElementById('verdict-can').checked = false;
+  document.getElementById('verdict-cannot').checked = false;
+  document.getElementById('verdict-can').disabled = false; // 直接启用
+  document.getElementById('btn-submit').disabled = true;
+  document.getElementById('type-locked-tip').style.display = 'none';
+  document.getElementById('check-result').style.display = 'none';
+  setTimeout(initCanvas, 50);
+}
+
+function buildShapeList() {
+  const el = document.getElementById('shape-list');
+  el.innerHTML = '';
+  SHAPES_CONFIG.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'shape-btn' + (i === state.currentShape ? ' active' : '');
+    div.id = `shape-btn-${i}`;
+    div.innerHTML = `
+      <div>${buildShapeSVG(s)}</div>
+      <div>
+        <div class="shape-btn-name">${s.name}</div>
+        <div class="shape-btn-sub">${s.sides > 0 ? s.sides+'边形' : '曲线形'}</div>
+      </div>`;
+    div.onclick = () => selectShape(i);
+    el.appendChild(div);
+  });
+}
+
+function buildShapeSVG(s) {
+  const sz = 32, c = sz/2, r = sz*0.4;
+  if (s.sides === 0) return `<svg viewBox="0 0 ${sz} ${sz}"><circle cx="${c}" cy="${c}" r="${r}" fill="${s.color}22" stroke="${s.color}" stroke-width="2"/></svg>`;
+  const pts = [];
+  for (let i = 0; i < s.sides; i++) {
+    const a = -Math.PI/2 + i * 2*Math.PI/s.sides;
+    pts.push(`${c+r*Math.cos(a)},${c+r*Math.sin(a)}`);
+  }
+  return `<svg viewBox="0 0 ${sz} ${sz}"><polygon points="${pts.join(' ')}" fill="${s.color}22" stroke="${s.color}" stroke-width="2"/></svg>`;
+}
+
+function selectShape(idx) {
+  if (state.lockedShapeId && state.lockedShapeId !== SHAPES_CONFIG[idx].id) {
+    showToast('只能使用同一种图形，已锁定', 'error');
+    document.getElementById('type-locked-tip').style.display = '';
+    return;
+  }
+  state.currentShape = idx;
+  currentAngles = [...SHAPES_CONFIG[idx].angles];
+  document.querySelectorAll('.shape-btn').forEach((el, i) => el.classList.toggle('active', i===idx));
+  buildAngleInputs();
+}
+
+function buildAngleInputs() {
+  const cfg = SHAPES_CONFIG[state.currentShape];
+  const wrap = document.getElementById('angle-inputs');
+  wrap.innerHTML = '';
+  currentAngles = [...cfg.angles];
+
+  // 角1 和 角2：可输入
+  [0, 1].forEach(i => {
+    const row = document.createElement('div');
+    row.className = 'angle-row';
+    row.innerHTML = `<div class="angle-lbl">∠${i+1}</div>
+      <input class="angle-in" id="angle-in-${i}" type="number" min="1" max="178" value="${currentAngles[i]}" oninput="onAngleCh(${i},this.value)">
+      <span class="angle-unit">°</span>`;
+    wrap.appendChild(row);
+  });
+
+  // 角3：只读，自动 = 180 - 角1 - 角2
+  const row3 = document.createElement('div');
+  row3.className = 'angle-row';
+  const a3 = 180 - currentAngles[0] - currentAngles[1];
+  row3.innerHTML = `<div class="angle-lbl" style="background:#e6f4ea;color:#1e8e3e;" title="自动计算">∠3</div>
+    <input class="angle-in" id="angle-in-2" type="number" value="${a3}" readonly
+      style="background:var(--bg3);color:#1e8e3e;cursor:default;font-weight:600;min-width:0;" title="角3 = 180° − 角1 − 角2，自动计算">
+    <span class="angle-unit">°</span>`;
+  wrap.appendChild(row3);
+  // 自动计算提示
+  const autoTip = document.createElement('div');
+  autoTip.style.cssText = 'font-size:9px;color:#1e8e3e;padding:2px 4px 4px 26px;line-height:1.4;';
+  autoTip.textContent = '∠3 = 180° − ∠1 − ∠2 自动计算';
+  wrap.appendChild(autoTip);
+  currentAngles[2] = a3;
+
+  updateAngleSum();
+}
+
+function onAngleCh(idx, val) {
+  currentAngles[idx] = parseFloat(val) || 0;
+  // 自动更新角3
+  const a3 = 180 - currentAngles[0] - currentAngles[1];
+  currentAngles[2] = a3;
+  const in3 = document.getElementById('angle-in-2');
+  if (in3) in3.value = a3;
+  updateAngleSum();
+}
+
+function updateAngleSum() {
+  const sum = currentAngles[0] + currentAngles[1] + currentAngles[2];
+  const el = document.getElementById('angle-sum-val');
+  const hint = document.getElementById('angle-hint');
+  el.textContent = sum + '°';
+  el.className = 'angle-sum-val';
+  const a3 = currentAngles[2];
+  if (a3 > 0 && a3 < 180 && Math.abs(sum - 180) < 0.5) {
+    el.classList.add('ok');
+    hint.textContent = `✅ 三角形内角和 = 180°`;
+    document.getElementById('btn-add').disabled = false;
+  } else {
+    el.classList.add('err');
+    if (a3 <= 0) {
+      hint.textContent = `⚠ 角3 = ${a3}°，角1+角2 不能 ≥ 180°`;
+    } else {
+      hint.textContent = `⚠ 内角和应为 180°，当前 ${sum}°`;
+    }
+    document.getElementById('btn-add').disabled = true;
+  }
+}
+
+let currentAngles = [60, 60, 60];
+
+// ═══════════════════════════════════════════
+//  ADD SHAPE (non-overlapping)
+// ═══════════════════════════════════════════
+
+// 计算三角形在给定 size 下的包围盒宽高（不含旋转）
+function getTriangleBounds(angles, size) {
+  const tmpSh = { angles, size };
+  const tmpCfg = { sides: 3, angles };
+  const pts = getLocalPts(tmpCfg, tmpSh);
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  return {
+    w: Math.max(...xs) - Math.min(...xs),
+    h: Math.max(...ys) - Math.min(...ys),
+  };
+}
+
+// 根据画布和角度计算合适的初始 size（让三角形包围盒约占画布短边的 1/4）
+function calcInitialSize(angles) {
+  if (!mainCanvas) return 120;
+  const W = mainCanvas.width, H = mainCanvas.height;
+  const target = Math.min(W, H) * 0.28; // 目标：包围盒短边约为画布短边的 28%
+  // size=1 时的包围盒
+  const b1 = getTriangleBounds(angles, 1);
+  const maxDim = Math.max(b1.w, b1.h) || 1;
+  const size = target / maxDim;
+  // 限制范围，避免极端值
+  return Math.max(40, Math.min(350, size));
+}
+
+function addShapeToCanvas() {
+  if (state.shapes.length === 0) {
+    // First shape: no restriction
+    state.lockedShapeId = SHAPES_CONFIG[state.currentShape].id;
+    document.getElementById('type-locked-tip').style.display = 'none';
+  } else if (state.lockedShapeId !== SHAPES_CONFIG[state.currentShape].id) {
+    showToast('只能使用同一种图形', 'error');
+    return;
+  }
+  const cfg = SHAPES_CONFIG[state.currentShape];
+  const W = mainCanvas.width, H = mainCanvas.height;
+
+  // 动态计算合适的 size（让三角形在画布中有合适的视觉比例）
+  // 如果已有图形，使用已有图形的 size 保持一致；否则根据角度自动计算
+  const initSize = state.shapes.length > 0
+    ? state.shapes[0].size
+    : calcInitialSize([...currentAngles]);
+
+  // Non-overlapping layout: grid（基于 initSize 动态间距）
+  const spacing = initSize * 1.4 + 20;
+  const count = state.shapes.length;
+  const cols = Math.max(1, Math.floor((W - 40) / spacing));
+  const row = Math.floor(count / cols);
+  const col = count % cols;
+  const startX = W/2 - (cols-1)*spacing/2;
+  const startY = H/2 - (Math.ceil((state.shapes.length+1)/cols)-1)*spacing/2;
+  const nx = startX + col * spacing;
+  const ny = startY + row * spacing;
+
+  const sh = {
+    id: state.nextId++,
+    type: cfg.id,
+    angles: [...currentAngles],
+    x: nx, y: ny,
+    rotation: 0,
+    size: initSize,
+    color: cfg.color,
+  };
+  state.shapes.push(sh);
+  state.selectedId = sh.id;
+  document.getElementById('canvas-hint-text').style.display = 'none';
+  render();
+
+  // 提示极端角度
+  const minAngle = Math.min(...currentAngles);
+  if (minAngle < 15) {
+    showToast(`⚠ 含 ${minAngle}° 的极小角，图形会很狭长，建议旋转后拼接`, 'info');
+  } else {
+    showToast(`已添加${cfg.name}（当前共${state.shapes.length}个）`, 'success');
+  }
+}
+
+// ═══════════════════════════════════════════
+//  CANVAS INIT & RENDER
+// ═══════════════════════════════════════════
+function initCanvas() {
+  const wrap = document.querySelector('.canvas-area');
+  mainCanvas = document.getElementById('main-canvas');
+  mainCanvas.width = wrap.clientWidth;
+  mainCanvas.height = wrap.clientHeight;
+  mainCtx = mainCanvas.getContext('2d');
+  bindEvents();
+  render();
+}
+
+function render() {
+  if (!mainCtx) return;
+  const W = mainCanvas.width, H = mainCanvas.height;
+  mainCtx.clearRect(0,0,W,H);
+  state.shapes.forEach(sh => drawShape(mainCtx, sh));
+  // 绘制接点角度标注
+  updateSelPanel();
+}
+
+function drawShape(ctx, sh) {
+  const cfg = SHAPES_CONFIG.find(c => c.id === sh.type);
+  if (!cfg) return;
+  const sel = sh.id === state.selectedId;
+  const hoverBody = sh.id === hoverShId && !hoverVInfo;
+  ctx.save();
+  ctx.translate(sh.x, sh.y);
+  ctx.rotate(sh.rotation * Math.PI/180);
+
+  if (cfg.sides < 3) {
+    return; // 只支持多边形
+  }
+  const pts = getLocalPts(cfg, sh);
+  // Fill
+  ctx.beginPath(); pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y)); ctx.closePath();
+  ctx.fillStyle = cfg.color + (sel?'66':hoverBody?'50':'30'); ctx.fill();
+  // Edges
+  for (let i=0;i<pts.length;i++) {
+    const a=pts[i],b=pts[(i+1)%pts.length];
+    const isSnapEdge = state.snapPreview && state.snapPreview.sId===sh.id && state.snapPreview.eIdx===i;
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+    ctx.strokeStyle = isSnapEdge?'#fff':sel?'#ffffffcc':cfg.color; ctx.lineWidth = isSnapEdge?3:sel?2.5:1.8; ctx.stroke();
+  }
+  // Angle labels
+  if (sel) {
+    const cx=pts.reduce((s,p)=>s+p.x,0)/pts.length, cy=pts.reduce((s,p)=>s+p.y,0)/pts.length;
+    ctx.font='bold 11px JetBrains Mono, monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    pts.forEach((p,i)=>{
+      const lx=p.x+(cx-p.x)*.42, ly=p.y+(cy-p.y)*.42;
+      ctx.fillStyle='rgba(255,255,255,.95)';
+      ctx.fillText(sh.angles[i]+'°',lx,ly);
+    });
+  }
+  // Vertex handles
+  if (sel||hoverBody||(hoverVInfo&&hoverVInfo.sId===sh.id)) {
+    pts.forEach((p,i)=>{
+      const hov=hoverVInfo&&hoverVInfo.sId===sh.id&&hoverVInfo.vIdx===i;
+      ctx.beginPath(); ctx.arc(p.x,p.y,hov?9:7,0,Math.PI*2);
+      ctx.fillStyle=hov?'#fff':cfg.color+'cc'; ctx.fill();
+      ctx.strokeStyle=hov?cfg.color:'rgba(255,255,255,.4)'; ctx.lineWidth=hov?2.5:1.5; ctx.stroke();
+      if (hov) { ctx.fillStyle='#000'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('↻',p.x,p.y); }
+    });
+  }
+  // Sel ring
+  if (sel) {
+    ctx.strokeStyle='rgba(26,110,245,.3)'; ctx.lineWidth=1; ctx.setLineDash([5,5]);
+    ctx.beginPath(); ctx.arc(0,0,sh.size/2*.8,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.restore();
+
+  // Ghost
+  if (state.snapPreview && state.snapPreview.gId === sh.id) {
+    ctx.save();
+    ctx.translate(state.snapPreview.gx, state.snapPreview.gy);
+    ctx.rotate(state.snapPreview.gr * Math.PI/180);
+    const fake = { ...sh, x:0, y:0, rotation:0 };
+    const pts2 = getLocalPts(cfg, fake);
+    ctx.beginPath(); pts2.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y)); ctx.closePath();
+    ctx.fillStyle=cfg.color+'18'; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.setLineDash([6,4]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.restore();
+  }
+}
+
+function getLocalPts(cfg, sh) {
+  const angles = sh.angles && sh.angles.length === 3 ? sh.angles : cfg.angles;
+  const n = cfg.sides;
+  if (n < 3) return [];
+
+  // 三角形：用正弦定理由三个真实内角推算顶点
+  if (n === 3) {
+    const a1 = angles[0] * Math.PI / 180; // ∠A（顶点0的内角）
+    const a2 = angles[1] * Math.PI / 180; // ∠B
+    const a3 = angles[2] * Math.PI / 180; // ∠C（= π - a1 - a2）
+    // 以底边 BC 为参考边，长度固定为 sh.size
+    // 按正弦定理：BC/sin(A) = AB/sin(C) = AC/sin(B)
+    const BC = sh.size;                            // 边 a（对应 ∠A）
+    const AB = BC * Math.sin(a3) / Math.sin(a1);  // 边 c（对应 ∠C）
+    // 顶点 B = (0, 0)，顶点 C = (BC, 0)，顶点 A 由角度推算
+    const bx = 0, by = 0;
+    const cx2 = BC, cy2 = 0;
+    const ax = bx + AB * Math.cos(a2);
+    const ay = by - AB * Math.sin(a2); // canvas y轴向下，所以取负
+    const pts = [{ x: ax, y: ay }, { x: bx, y: by }, { x: cx2, y: cy2 }];
+    // 中心化
+    const ccx = (ax + bx + cx2) / 3;
+    const ccy = (ay + by + cy2) / 3;
+    return pts.map(p => ({ x: p.x - ccx, y: p.y - ccy }));
+  }
+
+  // 其它多边形保留原来的正多边形逻辑
+  const turnAngle = 2 * Math.PI / n;
+  const pts = []; let curX = 0, curY = 0; let dir = -Math.PI / 2;
+  for (let i = 0; i < n; i++) {
+    pts.push({ x: curX, y: curY });
+    curX += sh.size * Math.sin(Math.PI / n) * Math.cos(dir);
+    curY += sh.size * Math.sin(Math.PI / n) * Math.sin(dir);
+    dir += turnAngle;
+  }
+  const ocx = pts.reduce((s, p) => s + p.x, 0) / n;
+  const ocy = pts.reduce((s, p) => s + p.y, 0) / n;
+  return pts.map(p => ({ x: p.x - ocx, y: p.y - ocy }));
+}
+
+function getWorldPts(sh) {
+  const cfg = SHAPES_CONFIG.find(c=>c.id===sh.type);
+  if (!cfg || cfg.sides < 3) return [];
+  const lp = getLocalPts(cfg,sh);
+  const cr=Math.cos(sh.rotation*Math.PI/180), sr=Math.sin(sh.rotation*Math.PI/180);
+  return lp.map(p=>({x:sh.x+p.x*cr-p.y*sr, y:sh.y+p.x*sr+p.y*cr}));
+}
+
+function getEdge(pts, i) {
+  const a=pts[i],b=pts[(i+1)%pts.length];
+  return {ax:a.x,ay:a.y,bx:b.x,by:b.y,mx:(a.x+b.x)/2,my:(a.y+b.y)/2,len:Math.hypot(b.x-a.x,b.y-a.y),dx:b.x-a.x,dy:b.y-a.y};
+}
+
+// ═══════════════════════════════════════════
+//  EDGE SNAP
+// ═══════════════════════════════════════════
+function computeEdgeSnap(sh) {
+  const THRESH = 50;
+  const SNAP_LEN_TOL = 0.08; // 8% 边长容差
+  const src = getWorldPts(sh);
+  if (!src.length) return null;
+  let best = null, bestD = Infinity;
+  for (const o of state.shapes) {
+    if (o.id === sh.id) continue;
+    const dst = getWorldPts(o);
+    if (!dst.length) continue;
+    for (let si = 0; si < src.length; si++) {
+      const se = getEdge(src, si);
+      for (let di = 0; di < dst.length; di++) {
+        const de = getEdge(dst, di);
+        // 必须边长相等（等长才能严丝合缝）
+        const lr = Math.abs(se.len - de.len) / Math.max(se.len, de.len);
+        if (lr > SNAP_LEN_TOL) continue;
+        // 检查端点是否对齐（反向）
+        const ptsOpposite =
+          (ptsEq(se.ax, se.ay, de.bx, de.by) && ptsEq(se.bx, se.by, de.ax, de.ay)) ||
+          (ptsEq(se.ax, se.ay, de.ax, de.ay) && ptsEq(se.bx, se.by, de.bx, de.by));
+        if (!ptsOpposite) {
+          // 尝试：中点对齐也能接受
+          const d = Math.hypot(se.mx - de.mx, se.my - de.my);
+          if (d > THRESH) continue;
+          if (d < bestD) {
+            bestD = d;
+            const cfg = SHAPES_CONFIG.find(c => c.id === sh.type);
+            const lp = getLocalPts(cfg, sh);
+            const la = lp[si], lb = lp[(si + 1) % lp.length];
+            const lmx = (la.x + lb.x) / 2, lmy = (la.y + lb.y) / 2;
+            const dstA = Math.atan2(de.dy, de.dx), srcA = Math.atan2(se.dy, se.dx);
+            const dRot = dstA - srcA + Math.PI;
+            const nr = dRot + sh.rotation * Math.PI / 180;
+            const nRd = (nr * 180 / Math.PI) % 360;
+            const cosN = Math.cos(nr), sinN = Math.sin(nr);
+            best = { x: de.mx - lmx * cosN + lmy * sinN, y: de.my - lmx * sinN - lmy * cosN, rotation: ((nRd % 360) + 360) % 360, sEI: si, dEI: di, dId: o.id };
+          }
+          continue;
+        }
+        // 完美端点重合：优先级最高
+        const d = Math.hypot(se.mx - de.mx, se.my - de.my);
+        if (d < bestD) {
+          bestD = d;
+          const cfg = SHAPES_CONFIG.find(c => c.id === sh.type);
+          const lp = getLocalPts(cfg, sh);
+          const la = lp[si], lb = lp[(si + 1) % lp.length];
+          const lmx = (la.x + lb.x) / 2, lmy = (la.y + lb.y) / 2;
+          const dstA = Math.atan2(de.dy, de.dx), srcA = Math.atan2(se.dy, se.dx);
+          const dRot = dstA - srcA + Math.PI;
+          const nr = dRot + sh.rotation * Math.PI / 180;
+          const nRd = (nr * 180 / Math.PI) % 360;
+          const cosN = Math.cos(nr), sinN = Math.sin(nr);
+          best = { x: de.mx - lmx * cosN + lmy * sinN, y: de.my - lmx * sinN - lmy * cosN, rotation: ((nRd % 360) + 360) % 360, sEI: si, dEI: di, dId: o.id };
+        }
+      }
+    }
+  }
+  return best;
+}
+
+// ═══════════════════════════════════════════
+//  EVENTS
+// ═══════════════════════════════════════════
+function bindEvents() {
+  mainCanvas.addEventListener('mousedown',onMD);
+  mainCanvas.addEventListener('mousemove',onMM);
+  mainCanvas.addEventListener('mouseup',onMU);
+  mainCanvas.addEventListener('mouseleave',()=>{isDragging=false;isRotating=false;hoverVInfo=null;hoverShId=null;mainCanvas.style.cursor='default';});
+  mainCanvas.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];const r=mainCanvas.getBoundingClientRect();onMD({offsetX:t.clientX-r.left,offsetY:t.clientY-r.top});},{passive:false});
+  mainCanvas.addEventListener('touchmove',e=>{e.preventDefault();const t=e.touches[0];const r=mainCanvas.getBoundingClientRect();onMM({offsetX:t.clientX-r.left,offsetY:t.clientY-r.top});},{passive:false});
+  mainCanvas.addEventListener('touchend',()=>onMU());
+}
+
+function hitVertex(x,y) {
+  const R=14;
+  for (let i=state.shapes.length-1;i>=0;i--) {
+    const sh=state.shapes[i];
+    const pts=getWorldPts(sh);
+    for (let v=0;v<pts.length;v++) {
+      if (Math.hypot(x-pts[v].x,y-pts[v].y)<R) return {sId:sh.id,vIdx:v};
+    }
+  }
+  return null;
+}
+
+function hitBody(x,y,sh) {
+  const cfg=SHAPES_CONFIG.find(c=>c.id===sh.type);
+  if (!cfg||cfg.sides<3) return Math.hypot(x-sh.x,y-sh.y)<sh.size/2;
+  const pts=getWorldPts(sh);
+  let in2=false;
+  for (let i=0,j=pts.length-1;i<pts.length;j=i++) {
+    const xi=pts[i].x,yi=pts[i].y,xj=pts[j].x,yj=pts[j].y;
+    if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi)) in2=!in2;
+  }
+  return in2;
+}
+
+function onMD(e) {
+  const x=e.offsetX,y=e.offsetY;
+  const vh=hitVertex(x,y);
+  if (vh) {
+    const sh=state.shapes.find(s=>s.id===vh.sId);
+    if (sh) {
+      state.selectedId=sh.id; isRotating=true; rotId=sh.id;
+      rotAngle0=Math.atan2(y-sh.y,x-sh.x)*180/Math.PI;
+      rotShape0=sh.rotation;
+      mainCanvas.style.cursor='grabbing';
+      render(); return;
+    }
+  }
+  for (let i=state.shapes.length-1;i>=0;i--) {
+    if (hitBody(x,y,state.shapes[i])) {
+      state.selectedId=state.shapes[i].id;
+      isDragging=true;
+      dragOffX=x-state.shapes[i].x; dragOffY=y-state.shapes[i].y;
+      state.snapPreview=null;
+      mainCanvas.style.cursor='grabbing';
+      render(); return;
+    }
+  }
+  state.selectedId=null; render();
+}
+
+function onMM(e) {
+  const x=e.offsetX,y=e.offsetY;
+  if (isRotating&&rotId!==null) {
+    const sh=state.shapes.find(s=>s.id===rotId);
+    if (sh) { sh.rotation=((rotShape0+Math.atan2(y-sh.y,x-sh.x)*180/Math.PI-rotAngle0)%360+360)%360; render(); }
+    return;
+  }
+  if (isDragging) {
+    const sh=state.shapes.find(s=>s.id===state.selectedId);
+    if (!sh) return;
+    sh.x=x-dragOffX; sh.y=y-dragOffY;
+    if (state.snapEnabled) {
+      const s=computeEdgeSnap(sh);
+      if (s) state.snapPreview={gId:sh.id,gx:s.x,gy:s.y,gr:s.rotation,sId:sh.id,eIdx:s.sEI};
+      else state.snapPreview=null;
+    }
+    render(); return;
+  }
+  // hover
+  const vh=hitVertex(x,y);
+  const oldV=hoverVInfo?hoverVInfo.sId+'-'+hoverVInfo.vIdx:null;
+  const newV=vh?vh.sId+'-'+vh.vIdx:null;
+  let oldSh=hoverShId;
+  hoverVInfo=vh; hoverShId=vh?null:null;
+  if (!vh) {
+    for (let i=state.shapes.length-1;i>=0;i--) {
+      if (hitBody(x,y,state.shapes[i])) { hoverShId=state.shapes[i].id; break; }
+    }
+  }
+  if (newV!==oldV||hoverShId!==oldSh) {
+    mainCanvas.style.cursor=vh?'crosshair':(hoverShId?'grab':'default');
+    render();
+  }
+}
+
+function onMU() {
+  if (isDragging && state.snapPreview) {
+    const sh = state.shapes.find(s => s.id === state.selectedId);
+    if (sh) {
+      // 吸附后检查是否会与其他形状重叠
+      const wouldOverlap = checkOverlapFor(sh);
+      if (wouldOverlap) {
+        showToast('⚠ 吸附位置会导致重叠，已取消', 'error');
+        // 撤销到吸附前的位置（近似：回到拖动起点）
+        state.snapPreview = null;
+        isDragging = false; isRotating = false; rotId = null;
+        if (hoverShId) mainCanvas.style.cursor = 'grab'; else mainCanvas.style.cursor = 'default';
+        render();
+        return;
+      }
+      sh.x = state.snapPreview.gx; sh.y = state.snapPreview.gy; sh.rotation = state.snapPreview.gr;
+      showToast('✨ 已自动边-边吸附', 'success');
+    }
+  }
+  isDragging = false; isRotating = false; rotId = null;
+  state.snapPreview = null;
+  if (hoverShId) mainCanvas.style.cursor = 'grab'; else mainCanvas.style.cursor = 'default';
+  render();
+}
+
+// 检查某形状若放在该位置，是否与其他形状重叠
+function checkOverlapFor(movingSh) {
+  const shapes = state.shapes;
+  const movingPts = getWorldPts(movingSh);
+  if (!movingPts.length) return false;
+
+  for (const other of shapes) {
+    if (other.id === movingSh.id) continue;
+    const otherPts = getWorldPts(other);
+    if (!otherPts.length) continue;
+
+    // A 的顶点是否在 B 内部
+    for (const p of movingPts) {
+      if (ptInPoly(p.x, p.y, otherPts)) return true;
+    }
+    // B 的顶点是否在 A 内部
+    for (const p of otherPts) {
+      if (ptInPoly(p.x, p.y, movingPts)) return true;
+    }
+  }
+  return false;
+}
+
+// ═══════════════════════════════════════════
+//  SELECTED PANEL
+// ═══════════════════════════════════════════
+function updateSelPanel() {
+  const sh=state.shapes.find(s=>s.id===state.selectedId);
+  document.getElementById('sel-empty').style.display=sh?'none':'';
+  document.getElementById('sel-panel').style.display=sh?'':'none';
+  document.getElementById('btn-delete-sel').style.display=sh?'':'none';
+  if (!sh) return;
+  const cfg=SHAPES_CONFIG.find(c=>c.id===sh.type);
+  document.getElementById('sel-type').textContent=cfg?cfg.name:sh.type;
+  document.getElementById('sel-rot').textContent=sh.rotation.toFixed(0)+'°';
+  document.getElementById('sel-angles').textContent=sh.angles.join('°, ')+'°';
+
+  // 计算三角形三条边长（基于 getLocalPts 顶点距离，精度 1 位小数）
+  if (cfg && cfg.sides === 3) {
+    const pts = getLocalPts(cfg, sh);
+    // pts[0]=顶点A, pts[1]=顶点B, pts[2]=顶点C
+    // 边a = B-C（∠A=angles[0] 的对边）
+    // 边b = A-C（∠B=angles[1] 的对边）
+    // 边c = A-B（∠C=angles[2] 的对边）
+    const sideA = Math.hypot(pts[1].x-pts[2].x, pts[1].y-pts[2].y).toFixed(1);
+    const sideB = Math.hypot(pts[0].x-pts[2].x, pts[0].y-pts[2].y).toFixed(1);
+    const sideC = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y).toFixed(1);
+    document.getElementById('sel-side-a').textContent = sideA;
+    document.getElementById('sel-side-b').textContent = sideB;
+    document.getElementById('sel-side-c').textContent = sideC;
+  }
+}
+
+function deleteSelected() {
+  if (!state.selectedId) return;
+  state.shapes = state.shapes.filter(s => s.id !== state.selectedId);
+  state.selectedId = null;
+  state.tilingChecked = false; state.tilingPass = false;
+  document.getElementById('verdict-can').checked = false;
+  document.getElementById('verdict-cannot').checked = false;
+  document.getElementById('verdict-can').disabled = true;
+  document.getElementById('btn-submit').disabled = true;
+  document.getElementById('check-result').style.display = 'none';
+  if (state.shapes.length === 0) {
+    state.lockedShapeId = null;
+    document.getElementById('canvas-hint-text').style.display = '';
+  }
+  render();
+  showToast('图形已删除', 'info');
+}
+
+function rotateSel(deg) {
+  const sh=state.shapes.find(s=>s.id===state.selectedId);
+  if (sh) { sh.rotation=(sh.rotation+deg+360)%360; render(); }
+}
+
+// ═══════════════════════════════════════════
+//  TOOLS
+// ═══════════════════════════════════════════
+function toggleSnap() {
+  state.snapEnabled=!state.snapEnabled;
+  document.getElementById('btn-snap').classList.toggle('active',state.snapEnabled);
+  showToast(state.snapEnabled?'边吸附已开启':'边吸附已关闭','info');
+}
+
+function deleteSelectedShape() {
+  if (state.selectedId === null) {
+    showToast('请先点击选择一个图形', 'info');
+    return;
+  }
+  state.shapes = state.shapes.filter(sh => sh.id !== state.selectedId);
+  state.selectedId = null;
+  state.tilingChecked = false;
+  document.getElementById('verdict-can').checked = false;
+  document.getElementById('verdict-cannot').checked = false;
+  document.getElementById('btn-submit').disabled = true; // 没有选择结论时禁用提交
+  render();
+  showToast('已删除选中的图形', 'info');
+}
+
+function clearCanvas() {
+  if (state.shapes.length===0) return;
+  state.shapes=[]; state.selectedId=null;
+  state.lockedShapeId=null;
+  state.tilingChecked=false; state.tilingPass=false;
+  document.getElementById('verdict-can').checked=false;
+  document.getElementById('verdict-cannot').checked=false;
+  document.getElementById('btn-submit').disabled=true;
+  document.getElementById('check-result').style.display='none';
+  document.getElementById('canvas-hint-text').style.display='';
+  render();
+  showToast('画布已清空', 'info');
+}
+
+// ═══════════════════════════════════════════
+//  TILING CHECK — 严格几何验证
+//  规则：边等长 + 方向相反 + 无顶点落内部 + 无边穿透内部
+// ═══════════════════════════════════════════
+
+const EPS = 1.5; // 坐标容差（像素）- 确保3条边被识别为同一个接点
+const COORD_PREC = 1; // 顶点坐标精度（小数位数）
+
+// 点是否在多边形内部（ray casting）
+function ptInPoly(px, py, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y, xj = pts[j].x, yj = pts[j].y;
+    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi))
+      inside = !inside;
+  }
+  return inside;
+}
+
+// 两点是否重合（容差 EPS）
+function ptsEq(ax, ay, bx, by) {
+  return Math.abs(ax - bx) < EPS && Math.abs(ay - by) < EPS;
+}
+
+// 线段 AB 和 CD 是否相交（严格：不相交于内部端点之外的任何位置）
+// 返回 'endpoint'（端点相遇 OK）、'mid'（中间相交 NG）、null（不相交）
+function segSeg(a1x, a1y, a2x, a2y, b1x, b1y, b2x, b2y) {
+  const det = (a2x - a1x) * (b2y - b1y) - (a2y - a1y) * (b2x - b1x);
+  if (Math.abs(det) < 0.1) return null; // 平行
+  const t = ((b1x - a1x) * (b2y - b1y) - (b1y - a1y) * (b2x - b1x)) / det;
+  const u = ((b1x - a1x) * (a2y - a1y) - (b1y - a1y) * (a2x - a1x)) / det;
+  // t ∈ [0,1], u ∈ [0,1] 表示在各自线段上
+  if (t >= -0.01 && t <= 1.01 && u >= -0.01 && u <= 1.01) {
+    // 检查是否在端点（容差范围内）
+    if ((t < EPS / Math.max(1, Math.hypot(a2x - a1x, a2y - a1y)) && u < EPS / Math.max(1, Math.hypot(b2x - b1x, b2y - b1y))) ||
+        (Math.abs(t - 1) < EPS / Math.max(1, Math.hypot(a2x - a1x, a2y - a1y)) && Math.abs(u - 1) < EPS / Math.max(1, Math.hypot(b2x - b1x, b2y - b1y))) ||
+        (t < EPS / Math.max(1, Math.hypot(a2x - a1x, a2y - a1y)) && Math.abs(u - 1) < EPS / Math.max(1, Math.hypot(b2x - b1x, b2y - b1y))) ||
+        (Math.abs(t - 1) < EPS / Math.max(1, Math.hypot(a2x - a1x, a2y - a1y)) && u < EPS / Math.max(1, Math.hypot(b2x - b1x, b2y - b1y))))
+      return 'endpoint';
+    return 'mid';
+  }
+  return null;
+}
+
+// 收集所有边（world coordinates），并对顶点进行聚类
+function collectEdges(shapes) {
+  const edges = [];
+  const rawVerts = []; // {x, y, edgeIdx, isEndA}
+  
+  for (const sh of shapes) {
+    const cfg = SHAPES_CONFIG.find(c => c.id === sh.type);
+    if (!cfg || cfg.sides < 3) continue;
+    const pts = getWorldPts(sh);
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len < 1) continue; // 退化边跳过
+      const edgeIdx = edges.length;
+      edges.push({ shId: sh.id, edgeIdx: i, ax: a.x, ay: a.y, bx: b.x, by: b.y, len });
+      rawVerts.push({ x: a.x, y: a.y, edgeIdx, isEndA: true });
+      rawVerts.push({ x: b.x, y: b.y, edgeIdx, isEndA: false });
+    }
+  }
+  
+  // 顶点聚类：把距离足够近的顶点合并
+  const n = rawVerts.length;
+  const parent = Array.from({ length: n }, (_, i) => i);
+  
+  function find(x) {
+    if (parent[x] !== x) parent[x] = find(parent[x]);
+    return parent[x];
+  }
+  
+  function union(x, y) {
+    const px = find(x), py = find(y);
+    if (px !== py) parent[px] = py;
+  }
+  
+  // 合并距离 < EPS 的顶点
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const d = Math.hypot(rawVerts[i].x - rawVerts[j].x, rawVerts[i].y - rawVerts[j].y);
+      if (d < EPS) union(i, j);
+    }
+  }
+  
+  // 计算每个聚类的中心
+  const clusterData = new Map();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    if (!clusterData.has(root)) clusterData.set(root, { xs: [], ys: [] });
+    clusterData.get(root).xs.push(rawVerts[i].x);
+    clusterData.get(root).ys.push(rawVerts[i].y);
+  }
+  
+  const centers = new Map();
+  for (const [root, data] of clusterData) {
+    centers.set(root, {
+      x: data.xs.reduce((a, b) => a + b, 0) / data.xs.length,
+      y: data.ys.reduce((a, b) => a + b, 0) / data.ys.length
+    });
+  }
+  
+  // 更新边的端点坐标为聚类中心
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    const center = centers.get(root);
+    const v = rawVerts[i];
+    const edge = edges[v.edgeIdx];
+    if (v.isEndA) { edge.ax = center.x; edge.ay = center.y; }
+    else { edge.bx = center.x; edge.by = center.y; }
+  }
+  
+  return edges;
+}
+
+// 主检测函数
+function checkTilingPass() {
+  if (state.shapes.length < 2) return false;
+
+  const shapes = state.shapes;
+  const allEdges = collectEdges(shapes);
+
+  // ── 1. 检查每对图形 ──────────────────────────────
+  for (let i = 0; i < shapes.length; i++) {
+    const A = shapes[i];
+    const cfgA = SHAPES_CONFIG.find(c => c.id === A.type);
+    const ptsA = getWorldPts(A);
+    if (!ptsA.length) continue;
+
+    for (let j = i + 1; j < shapes.length; j++) {
+      const B = shapes[j];
+      const ptsB = getWorldPts(B);
+      if (!ptsB.length) continue;
+
+      // 1a. 检查 A 的顶点是否落在 B 内部（重叠）
+      for (const p of ptsA) {
+        if (ptInPoly(p.x, p.y, ptsB)) return false;
+      }
+      // 1b. 检查 B 的顶点是否落在 A 内部（重叠）
+      for (const p of ptsB) {
+        if (ptInPoly(p.x, p.y, ptsA)) return false;
+      }
+
+      // 1c. 检查边是否穿透内部
+      // 收集 A 的所有边段
+      const edgesA = [];
+      for (let k = 0; k < ptsA.length; k++) {
+        const a = ptsA[k], b = ptsA[(k + 1) % ptsA.length];
+        edgesA.push([a.x, a.y, b.x, b.y]);
+      }
+
+      for (let bi = 0; bi < ptsB.length; bi++) {
+        const b1 = ptsB[bi], b2 = ptsB[(bi + 1) % ptsB.length];
+        let sharedEndpoints = 0;
+        let crossingEdges = [];
+
+        for (const [ax1, ay1, ax2, ay2] of edgesA) {
+          const r = segSeg(ax1, ay1, ax2, ay2, b1.x, b1.y, b2.x, b2.y);
+          if (r === 'mid') {
+            // 边穿透另一个形状内部 → 有缝隙或重叠
+            return false;
+          }
+          if (r === 'endpoint') sharedEndpoints++;
+        }
+
+        // 端点重合数量：0（分离）或 2（整条边重合）OK，1 个则边部分对齐 NG
+        if (sharedEndpoints === 1) return false;
+      }
+    }
+  }
+
+  // ── 2. 检查所有边是否有等长反向匹配 ─────────────────
+  // 边必须成对：每条边的反向等长边必须存在
+  // 不需要恰好配对（边界图形边可以悬空），只要没有内部"孤立"边即可
+  // 简化：检查任意两条有共享端点的边是否等长
+  const TOL = 0.05; // 5% 长度容差
+  const junctions = [];
+
+  // 收集所有顶点（去重）
+  const vMap = new Map();
+  for (const e of allEdges) {
+    for (const [vx, vy] of [[e.ax, e.ay], [e.bx, e.by]]) {
+      const key = `${vx.toFixed(COORD_PREC)},${vy.toFixed(COORD_PREC)}`;
+      if (!vMap.has(key)) vMap.set(key, []);
+      vMap.get(key).push(e);
+    }
+  }
+
+  // 每个顶点处：所有边长必须相等
+  for (const [key, edgesAt] of vMap) {
+    if (edgesAt.length < 2) continue; // 悬空端点 OK
+    // 检查所有边长是否相等（等长才能密铺）
+    const refLen = edgesAt[0].len;
+    for (const e of edgesAt) {
+      if (Math.abs(e.len - refLen) / refLen > TOL) return false;
+    }
+    junctions.push({ key, edges: edgesAt, len: refLen });
+  }
+
+  // ── 3. 检查接缝角度：每条边的两个端点处，邻边夹角是否凑成 360° ──
+  const TOL_ANGLE = 2; // 角度容差（度）
+  for (const e of allEdges) {
+    // 端点 A (e.ax, e.ay)
+    const keyA = `${e.ax.toFixed(COORD_PREC)},${e.ay.toFixed(COORD_PREC)}`;
+    const atA = vMap.get(keyA);
+    if (atA && atA.length > 1) {
+      const sumA = computeJunctionAngleSum(e.ax, e.ay, atA);
+      if (Math.abs(sumA - 360) > TOL_ANGLE) return false;
+    }
+    // 端点 B (e.bx, e.by)
+    const keyB = `${e.bx.toFixed(COORD_PREC)},${e.by.toFixed(COORD_PREC)}`;
+    const atB = vMap.get(keyB);
+    if (atB && atB.length > 1) {
+      const sumB = computeJunctionAngleSum(e.bx, e.by, atB);
+      if (Math.abs(sumB - 360) > TOL_ANGLE) return false;
+    }
+  }
+
+  return true;
+}
+
+// 计算某接点的内角和（绕接点周围的所有内角）
+// n条边从接点出发，把360°空间划分成n个扇区，每个扇区的角度就是该处的"内角"
+// 对于正六边形密铺：3个六边形在一点相遇，6条边均匀间隔60°
+// 扇区角度 = 360°/6 = 60°，总内角和 = 6 × 60° = 360°
+function computeJunctionAngleSum(jx, jy, edgesAt) {
+  if (edgesAt.length < 2) return 0;
+  
+  // 每条边相对于接点的方向角
+  const dirs = edgesAt.map(e => {
+    // 判断接点是边的A端还是B端
+    const isEndA = Math.abs(e.ax - jx) < EPS && Math.abs(e.ay - jy) < EPS;
+    const ex = isEndA ? e.bx : e.ax;
+    const ey = isEndA ? e.by : e.ay;
+    return Math.atan2(ey - jy, ex - jx);
+  });
+  
+  // 按角度排序（从小到大）
+  dirs.sort((a, b) => a - b);
+  
+  // 计算相邻边之间的夹角（扇区角度）
+  // n条边形成n个扇区，所有扇区的角度之和 = 360°
+  let total = 0;
+  for (let i = 0; i < dirs.length; i++) {
+    const next = (i + 1) % dirs.length;
+    let diff = dirs[next] - dirs[i];
+    if (next === 0) diff += 2 * Math.PI; // 绕回第一条边
+    
+    // diff 是弧度，转为度
+    const angle = diff * 180 / Math.PI;
+    total += angle;
+  }
+  
+  // 理论上 total 应该等于 360°（因为绕了一圈）
+  // 但如果有边没有均匀分布，total 可能不是 360°
+  return total;
+}
+
+// 对 junctions 着色（用于标注图）
+function getJunctionResults() {
+  const shapes = state.shapes;
+  const allEdges = collectEdges(shapes);
+  const vMap = new Map();
+  for (const e of allEdges) {
+    for (const [vx, vy] of [[e.ax, e.ay], [e.bx, e.by]]) {
+      const key = `${vx.toFixed(COORD_PREC)},${vy.toFixed(COORD_PREC)}`;
+      if (!vMap.has(key)) vMap.set(key, []);
+      vMap.get(key).push(e);
+    }
+  }
+  const results = [];
+  const TOL_ANGLE = 2;
+  for (const [key, edgesAt] of vMap) {
+    if (edgesAt.length < 2) continue;
+    const [jx, jy] = key.split(',').map(Number);
+    const sum = computeJunctionAngleSum(jx, jy, edgesAt);
+    results.push({ x: jx, y: jy, sum, ok: Math.abs(sum - 360) <= TOL_ANGLE });
+  }
+  return results;
+}
+
+// ═══════════════════════════════════════════
+//  CHECK TILING ACTION
+// ═══════════════════════════════════════════
+function checkTiling() {
+  if (state.shapes.length < 2) {
+    showToast('请先添加至少 2 个图形进行检测', 'error');
+    return;
+  }
+
+  const pass = checkTilingPass();
+  state.tilingChecked = true;
+  state.tilingPass = pass;
+
+  const badge = document.getElementById('check-result');
+  badge.style.display = 'flex';
+  if (pass) {
+    badge.className = 'check-pass';
+    badge.innerHTML = '✅ 满足密铺条件';
+    document.getElementById('verdict-can').disabled = false;
+    document.getElementById('verdict-cannot').disabled = false;
+    showAnnotatedModal();
+  } else {
+    badge.className = 'check-fail';
+    badge.innerHTML = '❌ 不满足密铺条件';
+    document.getElementById('verdict-can').disabled = true;
+    document.getElementById('verdict-can').checked = false;
+    document.getElementById('verdict-cannot').disabled = false;
+    document.getElementById('btn-submit').disabled = true;
+    showToast('当前拼接不满足密铺条件（存在重叠/缝隙/边不等长）', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════
+//  ANNOTATED IMAGE MODAL
+// ═══════════════════════════════════════════
+function showAnnotatedModal() {
+  const old = document.getElementById('success-overlay');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'success-overlay';
+  overlay.id = 'success-overlay';
+  overlay.innerHTML = `
+    <div class="success-card">
+      <div class="success-icon">🎉</div>
+      <div class="success-title">满足密铺条件！</div>
+      <div class="success-sub">以下为当前拼接图形的角度标注，请确认后选择结论并提交。</div>
+      <div class="success-canvas-wrap" id="success-canvas-wrap">
+        <canvas id="success-canvas" width="520" height="340"></canvas>
+      </div>
+      <div class="success-actions">
+        <button class="btn-dismiss" onclick="closeSuccessModal()">返回画布</button>
+        <button class="btn-save" onclick="saveSuccessImage()">💾 保存图片</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const sCtx = document.getElementById('success-canvas').getContext('2d');
+  renderAnnotatedCanvas(sCtx, 520, 340);
+}
+
+function renderAnnotatedCanvas(ctx, W, H) {
+  ctx.fillStyle = '#f4f6fb'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(26,110,245,.04)';
+  for (let x = 20; x < W; x += 20) for (let y = 20; y < H; y += 20) ctx.fillRect(x - 1, y - 1, 2, 2);
+
+  if (state.shapes.length === 0) return;
+
+  // Get junction angle sums
+  const junctions = getJunctionResults();
+
+  // Center the group
+  const xs = state.shapes.map(s => s.x), ys = state.shapes.map(s => s.y);
+  const cx = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const cy = ys.reduce((a, b) => a + b, 0) / ys.length;
+  const offX = W / 2 - cx, offY = H / 2 - cy;
+
+  // Draw each shape
+  state.shapes.forEach(sh => {
+    const cfg = SHAPES_CONFIG.find(c => c.id === sh.type);
+    if (!cfg) return;
+    ctx.save();
+    ctx.translate(sh.x + offX, sh.y + offY);
+    ctx.rotate(sh.rotation * Math.PI / 180);
+    const pts = getLocalPts(cfg, sh);
+
+    if (cfg.sides < 3) { ctx.restore(); return; }
+
+    // Shape fill
+    ctx.beginPath(); pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)); ctx.closePath();
+    ctx.fillStyle = cfg.color + '33'; ctx.fill();
+    ctx.strokeStyle = cfg.color; ctx.lineWidth = 2; ctx.stroke();
+
+    // Angle labels at each vertex
+    const mx = pts.reduce((a, p) => a + p.x, 0) / pts.length;
+    const my = pts.reduce((a, p) => a + p.y, 0) / pts.length;
+    ctx.font = 'bold 11px JetBrains Mono, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    pts.forEach((p, i) => {
+      const lx = p.x + (mx - p.x) * 0.38, ly = p.y + (my - p.y) * 0.38;
+      const ang = sh.angles[i] + '°';
+      const tw = ctx.measureText(ang).width;
+      ctx.fillStyle = 'rgba(255,255,255,.92)';
+      ctx.beginPath(); ctx.roundRect(lx - tw / 2 - 4, ly - 7, tw + 8, 14, 4); ctx.fill();
+      ctx.fillStyle = cfg.color;
+      ctx.fillText(ang, lx, ly);
+    });
+    ctx.restore();
+  });
+
+  // Draw junction rings with angle sums
+  junctions.forEach(j => {
+    const jx = j.x + offX, jy = j.y + offY;
+    const ringColor = j.ok ? '#1caf6f' : (j.sum > 360 ? '#d94040' : '#e8a020');
+    ctx.beginPath(); ctx.arc(jx, jy, 18, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,.93)'; ctx.fill();
+    ctx.strokeStyle = ringColor; ctx.lineWidth = 2.5; ctx.stroke();
+    const label = j.sum.toFixed(0) + '°';
+    ctx.font = 'bold 10px JetBrains Mono, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = ringColor; ctx.fillText(label, jx, jy);
+  });
+
+  // Title
+  ctx.fillStyle = 'rgba(26,110,245,.85)';
+  ctx.font = 'bold 13px Noto Sans SC, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('密铺探究 · 角度标注图', W / 2, 8);
+}
+
+function closeSuccessModal() {
+  const el = document.getElementById('success-overlay');
+  if (el) el.remove();
+}
+
+function saveSuccessImage() {
+  const c = document.createElement('canvas');
+  c.width = 520; c.height = 340;
+  const ctx = c.getContext('2d');
+  renderAnnotatedCanvas(ctx, 520, 340);
+  const link = document.createElement('a');
+  link.download = `密铺探究_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.png`;
+  link.href = c.toDataURL(); link.click();
+  showToast('图片已保存', 'success');
+}
+
+// ═══════════════════════════════════════════
+//  VERDICT & SUBMIT
+// ═══════════════════════════════════════════
+function onVerdictChange() {
+  // If "can" selected, ensure tiling was checked and passed
+  const canChecked = document.getElementById('verdict-can');
+  const cannotChecked = document.getElementById('verdict-cannot');
+  const v = canChecked.checked ? 'can' : cannotChecked.checked ? 'cannot' : null;
+
+  // "can" option is only selectable if tiling check passed
+  // 学生可以直接选择结论，无需检测
+  document.getElementById('btn-submit').disabled = !v;
+}
+
+function getSelectedVerdict() {
+  if (document.getElementById('verdict-can').checked) return 'can';
+  if (document.getElementById('verdict-cannot').checked) return 'cannot';
+  return null;
+}
+
+async function generateSubId(name) {
+  const all = await getSubmissions();
+  const mine = all.filter(s => s.studentName === name);
+  return `${name}-${String(mine.length + 1).padStart(3, '0')}`;
+}
+
+async function submitWork() {
+  const verdict = getSelectedVerdict();
+  if (!verdict) { showToast('请先选择结论', 'error'); return; }
+  if (state.shapes.length === 0) { showToast('请先添加图形', 'error'); return; }
+  if (db) updateSyncStatus('syncing');
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span><span>提交中…</span>';
+
+  const cfg = SHAPES_CONFIG.find(c => c.id === state.lockedShapeId) || SHAPES_CONFIG[0];
+  const name = state.currentUser || '匿名';
+  const cls = document.getElementById('login-class').value.trim() || '未知班级';
+  const all = await getSubmissions();
+  const prev = all.filter(s => s.studentName === name);
+  const seq = prev.length + 1;
+  const timeStr = new Date().toLocaleString('zh-CN');
+
+  // 截图
+  const snap = document.createElement('canvas');
+  snap.width = mainCanvas.width; snap.height = mainCanvas.height;
+  const sCtx = snap.getContext('2d');
+  renderAnnotatedCanvas(sCtx, snap.width, snap.height);
+
+  const sub = {
+    id: Date.now(),
+    subId: `${name}-${String(seq).padStart(3, '0')}`,
+    submitSeq: seq,
+    studentName: name,
+    studentClass: cls,
+    shape: cfg.id,
+    shapeName: cfg.name,
+    angles: [...currentAngles],
+    tilingResult: verdict,
+    conclusion: verdict === 'can' ? '可以密铺' : '不可密铺',
+    note: seq > 1 ? `第 ${seq} 次提交 · ${timeStr}` : `首次提交 · ${timeStr}`,
+    canvasSnapshot: snap.toDataURL(),
+    shapesData: JSON.stringify(state.shapes),
+    time: timeStr,
+    starred: false,
+    comment: ''
+  };
+
+  // 写入云数据库（或降级 localStorage）
+  if (db) {
+    try {
+      await db.collection('tess_submissions').add(sub);
+    } catch (e) {
+      console.warn('[CloudBase] 写入失败，降级本地', e);
+      const localAll = JSON.parse(localStorage.getItem('tess_submissions') || '[]');
+      localAll.push(sub);
+      localStorage.setItem('tess_submissions', JSON.stringify(localAll));
+    }
+  } else {
+    const localAll = JSON.parse(localStorage.getItem('tess_submissions') || '[]');
+    localAll.push(sub);
+    localStorage.setItem('tess_submissions', JSON.stringify(localAll));
+  }
+
+  btn.disabled = false;
+  btn.style.background = 'var(--green)';
+  btn.innerHTML = '<span>✓</span><span>已提交！</span>';
+  setTimeout(() => { btn.style.background = ''; btn.innerHTML = '📤 提交作业'; }, 2200);
+  showToast(`作业 ${sub.subId} 提交成功！`, 'success');
+  if (db) updateSyncStatus('cloud');
+}
+
+// ═══════════════════════════════════════════
+//  TEACHER
+// ═══════════════════════════════════════════
+async function initTeacher() {
+  const all = await getSubmissions();
+  await renderTList('all');
+  // 不再自动注入示例 — 教师可点击顶部「📋 导入示例数据」手动添加
+}
+
+async function clearAllData() {
+  if (!confirm('确定要清除所有学生的提交记录吗？此操作不可恢复。')) return;
+  if (db) updateSyncStatus('syncing');
+  if (db) {
+    try {
+      // 循环删除，直到云端一条不剩（防止 >200 条时漏删）
+      let deleted;
+      do {
+        const res = await db.collection('tess_submissions').limit(200).get();
+        const docs = res.data || [];
+        if (docs.length === 0) break;
+        await Promise.all(docs.map(d => db.collection('tess_submissions').doc(d._id).remove()));
+        // 确认已删空再继续
+        const verify = await db.collection('tess_submissions').limit(1).get();
+        deleted = (verify.data || []).length > 0;
+      } while (deleted);
+      console.log('[CloudBase] 云端数据已全部清除');
+    } catch (e) {
+      console.warn('[CloudBase] 清除云端数据失败', e);
+    }
+  }
+  localStorage.removeItem('tess_submissions');
+  state.selectedSubId = null;
+  document.getElementById('t-detail-empty').style.display = '';
+  document.getElementById('t-detail-content').style.display = 'none';
+  await renderTList('all');
+  showToast('已清除全部数据', 'success');
+  if (db) updateSyncStatus('cloud');
+}
+
+// ── 导入示例数据（仅写入本地，仅供演示/调试）──
+async function injectDemos() {
+  if (db) {
+    showToast('示例数据仅供本地演示，不会写入云端共享数据库', 'info');
+  }
+  const demos = [
+    {id:9001,subId:'李明-001',submitSeq:1,studentName:'李明',studentClass:'三年级一班',shape:'triangle',shapeName:'三角形',angles:[60,60,60],tilingResult:'can',conclusion:'可以密铺',note:'第 1 次提交 · 2026/04/19 09:10',canvasSnapshot:'',shapesData:'[]',time:'2026/04/19 09:10',starred:true,comment:'正三角形密铺，分析到位'},
+    {id:9002,subId:'李明-002',submitSeq:2,studentName:'李明',studentClass:'三年级一班',shape:'triangle',shapeName:'三角形',angles:[90,45,45],tilingResult:'can',conclusion:'可以密铺',note:'第 2 次提交 · 2026/04/19 09:18',canvasSnapshot:'',shapesData:'[]',time:'2026/04/19 09:18',starred:false,comment:''},
+    {id:9003,subId:'王芳-001',submitSeq:1,studentName:'王芳',studentClass:'三年级一班',shape:'triangle',shapeName:'三角形',angles:[30,60,90],tilingResult:'can',conclusion:'可以密铺',note:'第 1 次提交 · 2026/04/19 09:15',canvasSnapshot:'',shapesData:'[]',time:'2026/04/19 09:15',starred:false,comment:''},
+    {id:9004,subId:'张伟-001',submitSeq:1,studentName:'张伟',studentClass:'三年级二班',shape:'triangle',shapeName:'三角形',angles:[120,30,30],tilingResult:'can',conclusion:'可以密铺',note:'首次提交 · 2026/04/19 09:25',canvasSnapshot:'',shapesData:'[]',time:'2026/04/19 09:25',starred:false,comment:''},
+    {id:9005,subId:'刘小红-001',submitSeq:1,studentName:'刘小红',studentClass:'三年级二班',shape:'triangle',shapeName:'三角形',angles:[60,60,60],tilingResult:'can',conclusion:'可以密铺',note:'首次提交 · 2026/04/19 09:30',canvasSnapshot:'',shapesData:'[]',time:'2026/04/19 09:30',starred:true,comment:'结论正确'},
+  ];
+  localStorage.setItem('tess_submissions', JSON.stringify(demos));
+  await renderTList('all');
+  showToast('已导入示例数据（仅本地可见）', 'success');
+}
+
+// ── 读取所有提交（云优先，降级 localStorage）──
+async function getSubmissions() {
+  if (db) {
+    try {
+      // 云数据库单次最多取 100 条，此处取全部
+      const res = await db.collection('tess_submissions').orderBy('id','asc').limit(200).get();
+      return res.data || [];
+    } catch (e) {
+      console.warn('[CloudBase] 读取失败', e);
+    }
+  }
+  // 降级本地
+  try { return JSON.parse(localStorage.getItem('tess_submissions')||'[]'); } catch { return []; }
+}
+
+async function renderTList(filter) {
+  state.currentTFilter=filter;
+  let all = await getSubmissions();
+
+  // 只取每个学生最新的一次提交
+  const latestMap = new Map();
+  all.forEach(sub => {
+    const key = sub.studentName;
+    if (!latestMap.has(key) || sub.submitSeq > latestMap.get(key).submitSeq) {
+      latestMap.set(key, sub);
+    }
+  });
+
+  let items = Array.from(latestMap.values());
+  if (filter==='can') items=items.filter(s=>s.tilingResult==='can');
+  if (filter==='cannot') items=items.filter(s=>s.tilingResult==='cannot');
+  if (filter==='star') items=items.filter(s=>s.starred);
+  document.getElementById('t-count').textContent=`共 ${items.length} 名学生`;
+  const el=document.getElementById('t-items');
+  el.innerHTML='';
+  if (items.length===0) { el.innerHTML='<div class="t-empty">暂无作业</div>'; return; }
+  items.forEach(sub=>{
+    const div=document.createElement('div');
+    div.className='t-item'+(sub.id===state.selectedSubId?' active':'');
+    div.id=`t-item-${sub.id}`;
+    // 获取该学生的提交次数
+    const allSubs = all.filter(s=>s.studentName===sub.studentName);
+    const totalSubs = allSubs.length;
+    const isLatest = sub.submitSeq === totalSubs;
+    div.innerHTML=`<div class="t-item-top">
+      <span class="t-item-name">${sub.studentName}${sub.starred?' ⭐':''}</span>
+      <span class="t-badge ${sub.tilingResult==='can'?'can':'cannot'}">${sub.tilingResult==='can'?'可':'否'}</span>
+    </div>
+    <div class="t-item-meta">${sub.shapeName} · ${sub.time} ${totalSubs>1?'('+totalSubs+'次提交)':''}</div>`;
+    div.onclick=()=>openTSub(sub.id);
+    el.appendChild(div);
+  });
+}
+
+function tFilter(f,btn) {
+  document.querySelectorAll('.t-filter button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTList(f); // async，不需要 await
+}
+
+async function openTSub(id) {
+  state.selectedSubId=id;
+  document.querySelectorAll('.t-item').forEach(e=>e.classList.remove('active'));
+  const el=document.getElementById(`t-item-${id}`);
+  if (el) el.classList.add('active');
+  const all = await getSubmissions();
+  const sub=all.find(s=>s.id===id);
+  if (!sub) return;
+  document.getElementById('t-detail-empty').style.display='none';
+  const c=document.getElementById('t-detail-content');
+  c.style.display='flex';
+  document.getElementById('t-detail-name').textContent=sub.studentName;
+  document.getElementById('t-detail-meta').textContent=`${sub.studentClass} · ${sub.time}`;
+  document.getElementById('t-subId').textContent=sub.subId;
+  document.getElementById('t-seq').textContent=`第 ${sub.submitSeq} 次`;
+  document.getElementById('t-shape').textContent=sub.shapeName;
+  document.getElementById('t-angles').textContent=sub.angles.length>0?sub.angles.join('°,')+'°':'—';
+  document.getElementById('t-note-el').innerHTML=sub.note?`<div class="t-note">${sub.note}</div>`:'';
+  const isCan=sub.tilingResult==='can';
+  document.getElementById('t-conclusion').innerHTML=`<span style="font-size:18px">${isCan?'✅':'❌'}</span> <span style="color:${isCan?'var(--green)':'var(--red)'}">${isCan?'可以密铺':'不可密铺'}</span>`;
+  document.getElementById('t-comment').value=sub.comment||'';
+  const starBtn=document.getElementById('t-star-btn');
+  starBtn.classList.toggle('starred',sub.starred);
+  starBtn.textContent=sub.starred?'⭐ 已优秀':'⭐ 优秀';
+
+  // 历史记录面板
+  const studentSubs = all.filter(s => s.studentName === sub.studentName).sort((a, b) => a.submitSeq - b.submitSeq);
+  const histCard = document.getElementById('t-history-card');
+  const histList = document.getElementById('t-history-list');
+  if (studentSubs.length > 1) {
+    histCard.style.display = '';
+    histList.innerHTML = '';
+    studentSubs.forEach(s => {
+      const isActive = s.id === sub.id;
+      const row = document.createElement('div');
+      row.style.cssText = `padding:4px 7px;border-radius:6px;font-size:11px;cursor:pointer;background:${isActive?'var(--blue-light)':'transparent'};color:${isActive?'var(--blue)':'var(--text2)'};border:1px solid ${isActive?'var(--blue)':'var(--border)'};display:flex;justify-content:space-between;align-items:center;transition:all .15s;`;
+      row.innerHTML = `<span>第${s.submitSeq}次 · ${s.shapeName}</span><span style="font-size:10px;color:${s.tilingResult==='can'?'var(--green)':'var(--red)'}">${s.tilingResult==='can'?'可':'否'}</span>`;
+      row.onclick = () => openTSub(s.id);
+      histList.appendChild(row);
+    });
+  } else {
+    histCard.style.display = 'none';
+  }
+
+  setTimeout(()=>renderTDetail(sub),50);
+}
+
+function renderTDetail(sub) {
+  const wrap = document.querySelector('.t-canvas-wrap');
+  const dc = document.getElementById('detail-canvas');
+  dc.width = wrap.clientWidth;
+  dc.height = wrap.clientHeight;
+  detailCtx = dc.getContext('2d');
+  const W = dc.width, H = dc.height;
+
+  // 背景：与学生端保持一致
+  detailCtx.fillStyle = '#ffffff';
+  detailCtx.fillRect(0, 0, W, H);
+  detailCtx.fillStyle = 'rgba(26,110,245,.04)';
+  for (let x = 28; x < W; x += 28) for (let y = 28; y < H; y += 28)
+    detailCtx.fillRect(x - 1.5, y - 1.5, 3, 3);
+
+  // 优先用 shapesData 重绘，让展示与学生端完全一致
+  let shapes = [];
+  if (sub.shapesData) {
+    try { shapes = JSON.parse(sub.shapesData); } catch {}
+  }
+
+  if (shapes.length > 0) {
+    // 计算图形包围盒，居中放置
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    shapes.forEach(sh => {
+      const cfg = SHAPES_CONFIG.find(c => c.id === sh.type);
+      if (!cfg) return;
+      const pts = (() => {
+        const lp = getLocalPts(cfg, sh);
+        const cr = Math.cos(sh.rotation * Math.PI / 180), sr = Math.sin(sh.rotation * Math.PI / 180);
+        return lp.map(p => ({ x: sh.x + p.x * cr - p.y * sr, y: sh.y + p.x * sr + p.y * cr }));
+      })();
+      pts.forEach(p => { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); });
+    });
+
+    const bW = maxX - minX, bH = maxY - minY;
+    const pad = 40;
+    const scale = Math.min((W - pad * 2) / (bW || 1), (H - pad * 2) / (bH || 1), 1.6);
+    const offX = W / 2 - (minX + bW / 2) * scale;
+    const offY = H / 2 - (minY + bH / 2) * scale;
+
+    shapes.forEach(sh => {
+      const cfg = SHAPES_CONFIG.find(c => c.id === sh.type);
+      if (!cfg || cfg.sides < 3) return;
+      const pts = getLocalPts(cfg, sh);
+
+      detailCtx.save();
+      detailCtx.translate(sh.x * scale + offX, sh.y * scale + offY);
+      detailCtx.rotate(sh.rotation * Math.PI / 180);
+      detailCtx.scale(scale, scale);
+
+      // Fill
+      detailCtx.beginPath();
+      pts.forEach((p, i) => i === 0 ? detailCtx.moveTo(p.x, p.y) : detailCtx.lineTo(p.x, p.y));
+      detailCtx.closePath();
+      detailCtx.fillStyle = cfg.color + '40';
+      detailCtx.fill();
+
+      // Edges
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length];
+        detailCtx.beginPath(); detailCtx.moveTo(a.x, a.y); detailCtx.lineTo(b.x, b.y);
+        detailCtx.strokeStyle = cfg.color; detailCtx.lineWidth = 2 / scale; detailCtx.stroke();
+      }
+
+      // Angle labels at each vertex
+      const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+      const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+      detailCtx.font = `bold ${11 / scale}px JetBrains Mono, monospace`;
+      detailCtx.textAlign = 'center'; detailCtx.textBaseline = 'middle';
+      pts.forEach((p, i) => {
+        const lx = p.x + (cx - p.x) * 0.42, ly = p.y + (cy - p.y) * 0.42;
+        const ang = (sh.angles[i] || '?') + '°';
+        const tw = detailCtx.measureText(ang).width;
+        detailCtx.fillStyle = 'rgba(255,255,255,.92)';
+        detailCtx.fillRect(lx - tw / 2 - 3, ly - 7 / scale, tw + 6, 14 / scale);
+        detailCtx.fillStyle = cfg.color;
+        detailCtx.fillText(ang, lx, ly);
+      });
+
+      detailCtx.restore();
+    });
+  } else if (sub.canvasSnapshot && sub.canvasSnapshot.startsWith('data:')) {
+    // 没有 shapesData 时降级用截图
+    const img = new Image();
+    img.onload = () => detailCtx.drawImage(img, 0, 0, W, H);
+    img.src = sub.canvasSnapshot;
+  }
+}
+
+async function toggleStar() {
+  if (db) updateSyncStatus('syncing');
+  const all = await getSubmissions();
+  const sub = all.find(s => s.id === state.selectedSubId);
+  if (!sub) return;
+  sub.starred = !sub.starred;
+
+  if (db && sub._id) {
+    try {
+      await db.collection('tess_submissions').doc(sub._id).update({ starred: sub.starred });
+    } catch (e) { console.warn('[CloudBase] 更新失败', e); }
+  } else {
+    localStorage.setItem('tess_submissions', JSON.stringify(all));
+  }
+
+  const btn = document.getElementById('t-star-btn');
+  btn.classList.toggle('starred', sub.starred);
+  btn.textContent = sub.starred ? '⭐ 已优秀' : '⭐ 优秀';
+  renderTList(state.currentTFilter);
+  showToast(sub.starred ? '已标记为优秀' : '已取消优秀标记', 'success');
+  if (db) updateSyncStatus('cloud');
+}
+
+async function saveComment() {
+  if (db) updateSyncStatus('syncing');
+  const all = await getSubmissions();
+  const sub = all.find(s => s.id === state.selectedSubId);
+  if (!sub) return;
+  sub.comment = document.getElementById('t-comment').value.trim();
+
+  if (db && sub._id) {
+    try {
+      await db.collection('tess_submissions').doc(sub._id).update({ comment: sub.comment });
+    } catch (e) { console.warn('[CloudBase] 更新失败', e); }
+  } else {
+    localStorage.setItem('tess_submissions', JSON.stringify(all));
+  }
+  showToast('点评已保存', 'success');
+  if (db) updateSyncStatus('cloud');
+}
+
+// ═══════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════
+function showToast(msg,type='info') {
+  const icons={success:'✓',error:'✗',info:'ℹ'};
+  const cols={success:'var(--green)',error:'var(--red)',info:'var(--blue)'};
+  const t=document.createElement('div');
+  t.className=`toast ${type}`;
+  t.innerHTML=`<span style="color:${cols[type]};font-weight:bold">${icons[type]}</span> ${msg}`;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(16px)';t.style.transition='.3s';setTimeout(()=>t.remove(),300);},2800);
+}
+
+// ═══════════════════════════════════════════
+//  RESIZE
+// ═══════════════════════════════════════════
+window.addEventListener('resize',()=>{
+  if (document.getElementById('page-student').classList.contains('active')&&mainCanvas) {
+    const wrap=document.querySelector('.canvas-area');
+    mainCanvas.width=wrap.clientWidth; mainCanvas.height=wrap.clientHeight;
+    render();
+  }
+});
+
+// Init
+selectShape(0);
+</script>
+</body>
+</html>
