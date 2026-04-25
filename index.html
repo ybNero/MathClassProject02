@@ -533,6 +533,7 @@
 // ═══════════════════════════════════════════
 const CB_ENV_ID = 'mathclass-d5gz220u6e7f7f85f';       // 替换为你的云开发环境 ID（如 xxx-abc123）
 const CB_REGION = 'ap-shanghai';       // 根据你创建环境时选的地域填写
+const PAGE_ID = 'triangle'; // 页面标识，用于在共享数据库中区分不同密铺类型的作业
 
 let db = null; // 云数据库引用
 
@@ -1829,7 +1830,8 @@ async function submitWork() {
     shapesData: JSON.stringify(state.shapes),
     time: timeStr,
     starred: false,
-    comment: ''
+    comment: '',
+    page: PAGE_ID
   };
 
   // 写入云数据库（或降级 localStorage）
@@ -1916,8 +1918,8 @@ async function injectDemos() {
 async function getSubmissions() {
   if (db) {
     try {
-      // 云数据库单次最多取 100 条，此处取全部
-      const res = await db.collection('tess_submissions').orderBy('id','asc').limit(200).get();
+      // 云数据库单次最多取 100 条，此处取全部（只取当前页面的数据）
+      const res = await db.collection('tess_submissions').where({ page: PAGE_ID }).orderBy('id','asc').limit(200).get();
       return res.data || [];
     } catch (e) {
       console.warn('[CloudBase] 读取失败', e);
